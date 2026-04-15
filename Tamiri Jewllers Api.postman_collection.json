@@ -1,0 +1,894 @@
+{
+  "info": {
+    "_postman_id": "afe604cb-d472-419f-a630-a99cba38aba7",
+    "name": "Tamiri Jewllers Api",
+    "description": "Postman collection for Website API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "45391886"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get User Login OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getuserloginotp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getuserloginotp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Customer Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"\",\n  \"otp\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customerlogin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "customerlogin"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Categories & Products",
+      "item": [
+        {
+          "name": "Get Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/getcategory",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getcategory"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Categories with Subcategories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/getcategorieswithsubcategories",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getcategorieswithsubcategories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subcategory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getsubcategory",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getsubcategory"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"\",\n  \"page\": 1\n}"
+            },
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/getproducts",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getproducts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"9\",\n  \"user_id\":\"13\"\n}"
+            },
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/getproductdetails",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getproductdetails"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Top Products",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/gettopproducts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "gettopproducts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Recommended Products",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getrecommendedproducts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getrecommendedproducts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/getbrands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getbrands"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Banners & Media",
+      "item": [
+        {
+          "name": "Get Banners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "tamarijewellersapi.godavariwave.com/website_api/getbanners",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getbanners"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Banner Videos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/getbannervideos",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getbannervideos"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Home & Sections",
+      "item": [
+        {
+          "name": "Get Application Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/getapplicationdata",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getapplicationdata"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Place Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\",\n  \"items\": [],\n  \"totalAmount\": 0,\n  \"deliveryAddress\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orderplaced",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orderplaced"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getuserorders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getuserorders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getorderdetails",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getorderdetails"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Order ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/generateorderid",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "generateorderid"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Add User Cart Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"2\",\n  \"productId\": \"13\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/addusercartitems",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "addusercartitems"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Cart Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getusercartitems",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getusercartitems"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User Cart Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\",\n  \"cartItemId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/deleteusercartitems",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deleteusercartitems"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cart Count",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getcartcount",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getcartcount"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Wishlist",
+      "item": [
+        {
+          "name": "Add User Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\",\n  \"productId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/adduserwishlist",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "adduserwishlist"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getuserwishlist",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getuserwishlist"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\",\n  \"wishlistItemId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/deleteuserwishlist",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deleteuserwishlist"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reviews & Ratings",
+      "item": [
+        {
+          "name": "Add Product Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"1\",\n  \"productId\": \"2\",\n  \"rating\": 5,\n  \"review\": \"bfghgfh\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/postuserreviews",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "postuserreviews"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"2\"\n}"
+            },
+            "url": {
+              "raw": "https://tamarijewellersapi.godavariwave.com/website_api/postuserreviews",
+              "protocol": "https",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "postuserreviews"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Profile",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/getuserprofile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "getuserprofile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"\",\n  \"name\": \"\",\n  \"email\": \"\",\n  \"address\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/updateuserprofile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "updateuserprofile"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "pricing",
+      "item": [
+        {
+          "name": "get daily prices",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "tamarijewellersapi.godavariwave.com/website_api/getdailymetalrates",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "getdailymetalrates"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "B2B",
+      "item": [
+        {
+          "name": "post b2b",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"legal_buss_name\":\"gfgfgfg\",\r\n    \"buss_type\":\"jikhuh\",\r\n     \"gstin\":\"54566\",\r\n      \"gst_image\":\"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxMREhUTExIQFRUXGR0ZFhgYGBcYHhgXGhoXGBgeGBweHiogGBonGxgXIjEhJSkrLi8uGB8zODMsNygtLisBCgoKDg0OGhAQGy0lHx8tLS0tLS0uKy0tLS0tLS01LS0tLS0tLS0tLS0tLS0rLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAQsAvQMBIgACEQEDEQH/xAAcAAACAwEBAQEAAAAAAAAAAAAAAwQFBwIBBgj/xABMEAABAgMDBQcPCQkBAQEAAAABAhEAAyEEEjEFEyJBUQYyUmGS0dIHFCM0QkRUcXOBg5GTs8MWF1NicqGio7EVJDNDgrLB4fDxJcL/xAAXAQEBAQEAAAAAAAAAAAAAAAAAAQID/8QAJREBAQABAwMFAAMBAAAAAAAAAAERAhJRIWHwIjFBofGBseED/9oADAMBAAIRAxEAPwDStzG56xqsdmUqyWQkyJRJMmWSSUJck3amLL5NWLwOx+xl9GDcp2lZfISvdpi1gKr5NWLwOx+xl9GD5NWLwOx+xl9GLWCAqvk1YvA7H7GX0YPk1YvA7H7GX0YtYICq+TVi8DsfsZfRg+TVi8DsfsZfRi1ggKr5NWLwOx+xl9GD5NWLwOx+xl9GLWCAqvk1YvA7H7GX0YPk1YvA7H7GX0YtYICq+TVi8DsfsZfRg+TVi8DsfsZfRi1ggKr5NWLwOx+xl9GD5NWLwOx+xl9GLWCAqvk1YvA7H7GX0YPk1YvA7H7GX0YtYICq+TVi8DsfsZfRg+TVi8DsfsZfRi1ggKr5NWLwOx+xl9GD5NWLwOx+xl9GPZm6CzJUpCpyQpJZQL0qRWnEfu2xwvdNZAzz0VdsatspU7BrjWzVwOvk1YvA7H7GX0YzXqzZIs8rrXN2ezofOvdloS7ZpnYVxPrjWrNPTMSFpLpOGqMy6uHenpfgxkfe7lO0rL5CV7tMWsVW5TtKy+Qle7TFrAEEEEAQQQQBBBBAEEEEAR8jul3XKs80ykywCGqoEuCHoBiOP6vHT66M+3cIs67Q6pcwrSm6paSQAbpWE0NSQpIdqOKuzB9Zudyz13LMwIUhi20HbdOsP/2y1ik3HiULKhMpK0pSSCFveCibxfbiGOxou4AggggCCCCAIIIIDkIA1D/2pj26Ngj2CA8SkCgoIy7q4d6el+DGpRlvVw709L8GA+93KdpWXyEr3aYtYqtynaVl8hK92mLWAIIIIAggggCCCCAI4mTAkOogDaS0dwm1WVMwMsO1QxIILEOCCCCxIptgHRS2/ICZ03OKEghw4Mtd4gACqhMAJZ2N2gYVasACy3Uk2O0DBbZtZYqZYdjU0DirM3FHMzJdkBKes5xxSd+zJ7GMVYXXIOxjRxHTZO/n8ousnSRZ0EKXJCXLXU5sOASp7y1FRoS74DiidnUuBeS5qA4cji2x82RZ7xT1paNC+h2W10qKFEaVUnPLL7Lx1Qyy5MsqphQLNOSU6V5WdSkl0qob1S6zTiMTbPP0fRwQQRhRBBBAEEEEAQQQQBGW9XDvT0vwY1KMt6uHenpfgwH3u5TtKy+Qle7TFrFVuU7SsvkJXu0xawBBCrVNKEKWEqUUpJCRiogEsOM4RV/t7AdbWq9dCiLgo94bdqSPUdYizTb7C5gipVlpi3W1r1VzfCF7bqwOw0jqZlcpD9b2kggEXUOapvMUu4IwPGQNrXbRaQRWWXKxWW63tSeNSGGBNa8TeNhrELVllTK/drS4dhcxYLIYh8boHjWNVYbaLeFLtCAoJK0hRwBIBOOA14H1RATlZRBIs9ooASCkgl7r3aVa8Xw3pZ4iWlaZxCl2OYVpBa8CKDNqYEBi5UKazLOwQmnkWVqmhbBE5CSOMGujqeoY/eIRdWo6NqRwTopOk52GhqA3FxxUyZMlADWGfrTVKyq6kslzrqEln1uHaLhGQbMCkiSh0kFONCC4bz/5jVknkQLUS6haUhOHcsCGer8WHHD7JbZZQ+dlqZwpQUCAQHVXUz+qOVZJkkgmWlxQcQ0mA2AXlNseFJyFZwGEpLGpxrQga+M+sxn0qsQXj2F2eQmWkIQAlIoANQhkZBBBBAEEEcJmOop2N98B3BBBAEZb1cO9PS/BjUoy3q4d6el+DAfe7lO0rL5CV7tMTZ9oKTgGDVc90SBgDriFuU7SsvkJXu0w+2FQKiLxoigDu6lDgk6//MYDy2ZSEr+Jm0hiXKizCprd2REmbpJCQomZKZAdRClKui8lLlkUDqFdlcATDLcFpWlguYGqAEOkMS4BSxwbEYxCk2xQBCLLa00vMZclLkqTeFO60irYWVURvTpl/ROk5dlLUEJmSCpRYC+ampYaNcDFheXwUco9GKaz5QUSP3e2pqQ5lymFSHoXbXQPXDVDJuUpiWeVay96qUyiAEkB1OzPUjGghdPXoLV18FHKPRgdfBRyj0YXKQpQBvzA4BYhDh9RpjHeZV9Ir1J5owIkzKiUruKuJVTEqq+Fbjc3nELXlyWO6RtpnDwtiMdE0201iOVrWmYU3ZqqjSCU0p9lqePXHEy0TXpKmk6nCGdlXqhJbAVwN7iMakDk5all2KKBRI030GvUuY1FNddhjxWXJYq4wKsJhoLzn+HUC6f+IhYtEwu8qdQK1IILYDeuQrT1Uao0g/My0TWPYph0SW0atfoOx1cig+uMMIuJ5Q5OXZZJAUh0uT/EDXSQe4xoabK4RynL8sgm8kNi+cDN45cLl2iaSQJM0EAs4QHY0ANygIY1bxUj0WqdV5M5xszZfZW60MTyokJyuk3jo6NC+cDG6V60V0QTCk5flEAgpILgFpmIqf5eyORNXpXpcxwQzJSb2ipQIObGsXeImFm1TSkEyJrPgQhwcXYINOOGPMqtZM5SheSEkfaUMKHFMdGYp2ZD/aPRhMlKygF1gtRLJHixSKeMA8QwhGbWhV5a1F9YCdHiwwjAbPtSqi4lnYm+RXi0awoSlXhdZiMQs9HCGzbKtwUr24hOJ14VhsmylIYTFepPNAdpvgYJPHePRj28vgo5R6MeZlX0ivUnmgzKvpFepPNAdyV3g5DVI24Ej/EZh1cO9PS/BjTLIGTi+kqv9SozPq4d6el+DAfe7lO0rL5CV7tMSLVLUSq4166lnKgN8p3bieI+5TtKy+Qle7TEi1WnNqUo3QlkAkkipUoDAHWRAV2XrTmFSylctJU47IuaHoosm65vOAfMRrhVkNrmJC0myKSXDhc8VFC1OECP/Kz7bbxKWkzLiQQQNJRwqe4pQGEfKKQlhfkjYAVa72xHEY6TOOkR6mRa6uLNvgzLnF0sbxOxV5mFaPBIk2tlXxZnYXWmTsaXgXGGLHjFI6l7oZSlBImSSSboF5VScG0K6/UdhjiZumkpKQVyxeJSkutiUgKVpXGwUPXDGrgeSpNsYXk2V9bTZ9BxFq/d54n2azrdV9mfQCVLcJbui9S74RCVukkjGZJGPdq1Ak9xxH1RPstrM1IWjNqSXYhZ1Eg9ztBETVn5ivZMgOvfb7hK4KeOG9bj63KVzxXryoJa1pXcSXBJJUwBAAc3GGBx2R7Ky3LUSEqlFsdJVMfqfVPnDRnFE/rcfW5SueDrcfW5SueK39vyna/LfY6+hxj1iO5mW0JoVSw2LqV0MOOG28Cf1uPrcpXPB1uPrcpXPEKz5XQtQSlUok0AvKxZyN5i1WibeXwUco9GFmAdbj63KVzwdbj63KVzwXl8FHKPRiPNtUwEshBZn0zr1DRiDoXCe7bbeU3reGmzJIreI+0rniEJKzghJ1VmFk+a7EyXfAAuooOEejAEuyJSGF/lK54663H1uUrngvL4KOUejBeXwUco9GAOtx9blK54Otx9blK54Ly+CjlHowXl8FHKPRgPLIGT/Urj7pUZn1cO9PS/BjTLI92rPeVx90qMz6uHenpfgwH3u5TtKy+Qle7TD7aVAqKbxLI0RdqCpQOKTgHPm1Ywjcp2lZfISvdpiwTv1fZT+q4CqypaFSlobOTL2iwMpJFCXAUBeLgBhWpOqFIt0442e0g0wMg7AXoNZPqiwt1glzlpExAUEhw70OGriMJO5yy07BLoXFMC5P6knzxuXTjr59oRMtM/uJE4m4FaSpSReJQLrhJwBU5+pxiPJlsmgEmRaaVpmS+3AO7auIjY9tY7GiSm7LSEpd2G3/hD4mZwqhNqnkOmzz6EghSpKTdZ3ACS7mjONcMlW2aUvmbUKAscxiSzePXs+9rqCGZwPn1ZSKFqQtFrJupWSiWlaXIAuXgjfBtgoRAnK6XAUm2IdSUgqlJAvKZnN2lfvG0h0ZVmXbQs3soJ0B/CSVy6VwAIEzaWFGrjCZQBXWflK8A9QUhSexOWAu0vDUDU0akdJpmETzlOhIl20qBACc0gE3iA4JSzDE1wEeKyoG/h20i8lKuwppfCi7XXUkMxIffDjaNItV1wV5RmXnS6pbXWDOGSnWMePzx1Y5t5d0TMo4GqkFIdJS9SkVN+gwLFt7RtnAnzLUwSprQXchpaHTROIuuCym8x85Pt5SWa1mrOEJZ3DdzsL+YjGkQhaHoVW8HSYhBw0P6aMWNMTqNVWif3aJltYNnBUskJI3uIc6xUniEZmkTTlBRWlH70i82lcQRpB8bupwDsJhQtKlKBCbUFNiUS8WetKU14UpBKtglpSlSLTMQ2/KC4LqTUUL6L4YEbYmJyohCbwlWg4voElwEnzvepqoYmOwRY7cXSm7axeNSUIYO1SW2luJi+2OpWUVHGXbE0BqiXr8Q+6JC8sJA/hWjxZsx4nLKSSM1aAxAfNqxJb/jhDHYcS7YoliLSkMC5SjWUjg4h67GMKGUlEEhFspi6JYxvcVRo/iEPOW0i88m06JI/hk3m4LYxZgxL0+FQ7IpUwPenJqzKCBs+rx+sGH5lX0i/Ujow6CMhNkDJxJ0lVLcJWyMz6uHenpfgxptmwP2lf3KjMurh3p6X4MB97uU7SsvkJXu0xYJ36vsp/VcV+5TtKy+Qle7TFgnfq+yn9VwHn8z+n/MOhP8AM/p/zDoAggggCCCCA+dyrOKZi9K2JTokmUkFIYKepFKb7iCWq0RCVAupeVGKiN5edKgCGCBoAXkh2cXVYVMOyspp6j/9HBNZCbyNepjpYPxEccMsxupE3/6SgMUqBvUdJJSzqfGjuwakdp0iIqJpljHKqgEXQ6QcaOzOpQKTjWnHXuRNE5wmdlKgKjoBGACru9orSGjj5mgnWm6g3VZSe64GbdnF5iAKmqdF7wwpWLGyWRSarnziSKJWoNVIFQ1K1rrJhbjqKxVoJlBF63KLqJN03rgLAPsGj9Y3XwJeTkzJ+dvqE+1MCUMoJSQSnaBUMpJB2ipOqzlAuNEhQYYUA111vE5CAMA0Y3itl5HISEi02mgbfJx24fdhHZyYr6edQkiowISGO1iH85ixgibqqs/ZBYpNotJBDb8PvkkEKZ3AS2OBLuS8dJyYpyTaJ5cEMSGDghwwFa/cIsYIm6isRkkhLC0WjlA/ez/954l2KzGWm6VrXUl1kE+KgwESIIW2ggggiBVmwP2lf3KjMurh3p6X4MabZsD9pX9yozLq4d6el+DAfe7lO0rL5CV7tMWCd+r7Kf1XFfuU7SsvkJXu0xYJ36vsp/VcB5/M/p/zDoT/ADP6f8w6AIIIIAggggKe25FTPWtRm2hBcB5cwpYJDimDurEjuQMHBLXkkVPXFrSCq9oqFCVXuDgMPEGizkYr+1/+Uwu1TKCui7KIjW6iLaMkpmJSM7Oo2kFBy16uGOkahsBshKMmBMxRTnSS40iCkVFRR9W2J0jRVdSbycccIlxN1HiQwaPYIIgIIIIAggggCCCCAIIIIBVmwP2lf3KjMurh3p6X4MabZsD9pX9yozLq4d6el+DAfe7lO0rL5CV7tMWCd+r7Kf1XFfuU7SsvkJXu0xItZWCoywSpkaLgOLynqRqDnzQD/wCZ/T/mHRW27OpLywpamGi6BR61I/7YcIjptVqKVHrZYUALozsouS7uQmjMPG8WTIuoIp51otILJkLUHZ85KAa8zh671j43EdZNn2hZAmylS9F3C0KD0pQY1Os704Ui7aLaCF5o8NX4eaOZkgkEX11+zzRkRzMvZwIIOlUcV1OEdIlgspDMaKScP/YqJgnCaoS0LLHfOhIACfFpObuzHXqmINoBT2PfHTLoDV8702cfiNwLVEsJwAEdRDsYmKBMy8guQACkuNRwiRmjw1fh5ogZBC80eGr8PNBmjw1fh5oBkELzR4avw80GaPDV+HmgGQQvNHhq/DzQZo8NX4eaAZBC80eGr8PNBmjw1fh5oBkELzR4avw80GaPDV+HmgPLNgftK/uVGZdXDvT0vwY0yyjR26Sv7lRmfVw709L8GA+93KdpWXyEr3aYdbJYUohqsity+wvKfuSKhx54TuU7SsvkJXu0xKtNmE0qQp2IQaFjRSlD7xAQLfICi0sCWphXMlVHrQp/7ixhCbHOuqBXJcgMRZlaJre8epn2HbFpbLKmabqw4YHzpUFD7xEeTkNKQRnrUq8GJM1T0INNhpiKsTGpZj/BDm2KbeN2ZLuuSAqzOWowJAGu9VuDsLtydZlovZ3NzaC6RIKDeredks29b+rijtW5yW5KJlolkhINyYoUSEpFMN6kDznWYjTsiylIMtM60v5VdcQz6wxw4hsjWZj3+kS1rlqTSVV9ICWX/tgs9wKAzaWrQS1FvGbseWGxJQexqm3jvr6lKAAfb44tkIAwAHijF7KppllJUsyylIcMlUhw4FTgDV00+rqd4mWeSgJAWhKlayJRD1pRtkKtUieVqVKmpSMLikuCWd72IOA1imBh1lkzwoFc1Ck60hDVZsXw1xfgc2qVLuKaXW6WaWcWP1Yg9YLJrMSBXCQHDilSmrHiHG7VvoIkooV2CYQWWkHV2AFsfqeL1euzzcr6MezPRiXBC0RM3K+jHsz0YhyrML7sLjl0GT9ZdQbr1dPqi3jP936yLShnDyhUGu+mDxjGp2E7Ig+1zcr6MezPRhVrlS82tpdbpZpZxYt3MfG7gJpVaVOFBpRoXcKvICgof0jXwqRoUBRIsUwBiuWS1D1vjUHSDbARRt8TsjgWOcx0pDtTsCiAWxwD/wCuNh9BBGtwqbDZiknOXFhhdaSUkHW5ar0iXm5X0Y9mejEuCM2hFiAu0DC8pgzd0rVGadXDvT0vwY02zYH7Sv7lRmXVw709L8GA+93KdpWXyEr3aYfbZ5llShUAIoElRqpQppDbCNynaVl8hK92mDKZnCYDKQFi7pi+UU0mYg4k8RiyZo8yhbVSVpJClgpL3JZVdAdRJ08KanqRClZcZ6TMHHYF1cOG0vFi2IfGErn2kAKNlAJADdcF66sGcFtsTLKqYEvPF1T0SmYpVNr09UaxJOv9oinLwUlX8QBiHzEzUQktpOaqH3xFXl2iULRNQpkkPJU1Qg0IWQSLwSWetIt0WY3bocpOCr6sPE8TE2YAAOun1lc8TOnhVYctcU32Ezx7YmWG0mchMxC0FKsDcO1uFxRIzA2r5SueDMDavlK54lwIFotxkvec1xTLUpmSnFlRz+2A7adMexLobxTt2g+qLAWZIeq646SvFtj3MDavlK54dBWrywzuJjin8JR+8Kbmq7MW9VlgAOyzo3mzSsHIrpULjXtfCsWOYG1fKVzwZgbV8pXPDMFerKrKUlpjpJBaUogsWcEKYglvXVo9l5VvOEhZIDtmlBxo4EqAJ0hR9RifmBtXylc8GYG1fKVzwzBXpys4BAWxLfwlhqA1c4VAfB32Fq/KNlkz5qTMlrWq4GIBASNIsWmBlb6PoMwNq+UrngzA2r5SueHQVOR8hypJE2VLEtRTdqFEhNCA18gYDxRbXV8JHJPSgzA2r5SueDMDavlK54gLq+EjknpQXV8JHJPSgzA2r5SueDMDavlK54Aur4SOSelBdXwkck9KDMDavlK54MwNq+UrngPLLva8JX9yozPq4d6el+DGmWUMn+pXH3SozPq4d6el+DAfe7lO0rL5CV7tMWCd+r7Kf1XFfuU7SsvkJXu0xMVNCVl729TglR1r2CAZaJV4NgcR44QorVS4AWa9xQ7rpOyZyF80HXSdkzkL5oBkpF0AbI6hPXSdkzkL5oOuk7JnIXzQDoIT10nZM5C+aDrpOyZyF80A6CEC1pL7+mOgvx7OODrpOxfIXzQHzwzbkCdbkhmpQJdy5LNh/wA7NGtVVXEzrZcwK1EkAApOiARpOlNTRirFzEtFjUxBlkYNojSrgoZpgzu4rTzxxaLCTLbNzFF1OAkJJdIAqEJ1vr1niEc/+szpuFgyfNRNSoCZbCEqLKSokkgovB2c3VBSaUqsYik6wWYJmJINtxNFklALLqfWfwx3Z1lF27Z0AhKUuErDBheA0MAf0iVLti3F5BA1kJmHbQC74vvi6NO3TJbnCVOghPXSdkzkL5oOuk7JnIXzRsOghPXSdkzkL5oOuk7JnIXzQDoIT10nZM5C+aDrpOyZyF80A6CE9dJ2TOQvmg66TsmchfNAe2bA/aV/cqMy6uHenpfgxplkU6XrvlYgjulajGZ9XDvT0vwYD73cp2lZfISvdpiNl+XIMxJnkJZJuKMxctncKdSaAb3E4traJO5TtKy+Qle7THOVZgSsEylTKBmlZwpGk54noG1+YtrT7iNY59mkkqTOkhwxvWkkMNJ2VTzxPs+VpcwgImWdROAE0EnXQNWlYqTaEu/Wc1y6T+7DejS4TEEn1vDZVuCWULLPSeKzhxU7Ffptjd055Re3l8FHKPRgvL4KOUejFPMyxNBbre0EUciXg4B4VT4n81QLCxzlzElWkipDLl3TQs7XsDqMc7psVIvL4KOUejBeXwUco9GPLi+Gnk/7guL4aeT/ALiCot0uWpahNupU4IOdWil1AxAGswlMuzC92SUwSkKBtBoAsFJLihvMH14RJtaylar0szK4plFZGgigrzfqyEWtKiUizTDqP7uGLEhnvMWKf0jpM4R7LlyAUqCgWVevZ5ZSVU3xa73aWB2honDLEv6Sz4P/ABRgcNUQp1sa8k2eYoXu5kXgprlTVhVuQdkeqmBJH7uouxBTJBqQ+2mLOaQxn3ExWV0BdwqlBVaFRGBIxKWZwQ/EdkSbPaTMSFIzSknBSVuD4iEsYh2UZwl5QTQKdcoBySePfC6D5xE5ElSQwUgAaghv8xi4V1eXwUco9GC8vgo5R6MeXF8NPJ/3BcXw08n/AHEHt5fBRyj0YLy+CjlHox5cXw08n/cFxfDTyf8AcB7eXwUco9GC8vgo5R6MeXF8NPJ/3BcXw08n/cB7eXwUco9GC8vgo5R6MeXF8NPJ/wBwXF8NPJ/3AFke7XhK4+6VGZ9XDvT0vwY0yyPdrjeVxd0qMz6uHenpfgwH3u5TtKy+Qle7TC8rqmiYM3mt7pBcxct6qusUna70OqGblO0rL5CV7tMLywqYJiTLM0aNbiQqjnEGh+7XF0+4VLXNIS5kA3tIifMOg6KgONIi/R6MMcIWmdPYOmzvR/3ma2JfVsb1xIyciZNQyl2lCkqoVpSgkXaUSWUA/daxrh82wz2TdtSgQGJMuXpaTuzUITSnFG+mfj7RDmrnaV0yGCjcBnzKpZTXje0STdwBauL04vz7wrZ7usZ+a+rAvqrq/RjN/Z0/wteL7xGxIH6E/wBUOVY51P3lYrU3JbniwpE6dvsRMmrUXz5lJwu3LRMVtvO5DNTx8UTexfSH2qulEcZNngMLXMxBJKEE01VwBp6uOHGxzWP7ysUTW4ihSCFHDuixbU1IlkVFU15VyYnGt6avFpbYL2XvuhS1TdS5WqpmzK0D/wAylX2xLFhn67UrzS0YOcXHGMGwjpVhmsQLSsYMbiSzJY44ua1wh0C7CXBzq0gvS7NXgwx0zV3iR2L6Q+1V0o4VY5xJPXKgKMAhFGDGpGJNf8RwrJ84v+9TKg9xLxOt2eGJyHdi+kPtVdKDsX0h9qrpQqZYZ5Aa0qBAbeJL1LP5ro83HHByfaGI67XjQ5uXsYjDB67YYnIkdi+kPtVdKDsX0h9qrpQudYZyrzWlaXUCGQnRSARdHnIL40jldhnkqItSgCVMBLQboO9Z9g9dYYnId2L6Q+1V0oOxfSH2qulC12CaQAbQvekUSkOSTUs2osw2PHJsE/wpeDBpcvirUF8PWfNExOQ7sX0h9qrpQdi+kPtVdKELybNUCDaplcCEpSQKYNQ+Mg4nWxB+z5/hS2YAOhGo1c4kkU+/GLich/YvpD7VXSg7F9Ifaq6UczbFNLtaFpqSNFBYF2FRUDjibLSQACXIFTg520iYCrE1yhcOpi790rXrjNOrh3p6X4MabZsD9pX9yozLq4d6el+DEH3u5TtKy+Qle7TDMo2vNLGhPVeTUoSlQF1yxq7m9she5TtKy+Qle7TEu0WdalpUJqkpGKQEkKrrJDjzRZ3ERGUwWpaA9zGUf5mGqja9muEDLiTgm1HD+Sdb0NKGnmiSrJa6NaJ2AGOy658ZunlGFy8kzB31ONGc6jdUl8WxUD/SKxv0oWvLiAWa0kgBRAkkkA7QBjQ01tR48mZcA7i1nHCSdj7GiSnJ010E2qbomuihli+VMQzDRIS4Y044WMlzmD2ya+tkoAZgGwfEEu71h6fPwJm5eSlakFNqdJIpKdwlnUnhJcgONcdDLqbhmEWkAFiDKYpoFaVKC6QXO2GpyXOHfk7ky6t4x62gVkucQB13Oa6x0UOS5JU7ODUBhRhD0efgV+3AUuEWs6N5hJLkM9HAcnZHIy+klgm1E0cZnB8HpSgJiTKybOCkqNqmqY1BShiNjAD18Zwo1pEu0U8nK4Uq7dtQcgOZRArxtgNfi4w6lZdYPmrYTSglBxeDjGhpixpri9giZnCqdGWAVFN21U1mSQDR6FqlubGOBltJwTa/FmVD9Q0XcEMzgUpy2l2u2t6j+CoinGA0dnK1CQi1EgAtmgCXuhg9CdLbqMW8EMzgUasvIFztrTF4PJUKXimoKdEuBQ1qIYnK4Kgm7anJA/glg+0s231eJ7iCGZwKObl1KQkqFqF7DsXGRqFKj1VwrAcuDgWv2OHjpF5BDOngUq8tpDBrS5F5s0XCbxQ5DOKj1Q2x5SzigkC0JJffS7oDVqSG9UWsEMzgcSkXQzvUn1kn/MZh1cO9PS/BjUoy3q4d6el+DGR97uU7SsvkJXu0xax+esmbvsoIkykJtDJTLSlIzcksAkAYo2RK+cTKXhP5UnoQG9wRgnziZS8J/Kk9CD5xMpeE/lSehAb3BGCfOJlLwn8qT0IPnEyl4T+VJ6EBvcEYJ84mUvCfypPQg+cTKXhP5UnoQG9wRgnziZS8J/Kk9CD5xMpeE/lSehAb3BGCfOJlLwn8qT0IPnEyl4T+VJ6EBvcEYJ84mUvCfypPQg+cTKXhP5UnoQG9wRgnziZS8J/Kk9CD5xMpeE/lSehAb3BGCfOJlLwn8qT0IPnEyl4T+VJ6EBvcEYJ84mUvCfypPQg+cTKXhP5UnoQG9wRgnziZS8J/Kk9CD5xMpeE/lSehAb3GW9XDvT0vwY+W+cTKXhP5UnoR8zu03WWy05rPTr92/d0JYZ7j4JGwQH//2Q==\",\r\n       \"pan_num\":\"54544\", \r\n       \"pan_imag\":\"data:image/jpeg;base64,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\", \r\n       \"buildin_no\":\"84654\",\r\n        \"street\":\"hfghfghf\",\r\n         \"locality\":\"hgghgh\", \r\n         \"city\":\"fgfhfh\", \r\n         \"district\":\"thfht\",\r\n          \"state\":\"hggh\",\r\n           \"pincode\":\"556555\",\r\n            \"name\":\"jikhuk\", \r\n            \"role\":\"yghgb\", \r\n            \"phn_numb\":\"hfghfh\",\r\n             \"email\":\"dhg@gmail.com\",\r\n              \"whatsapp_num\":\"856556625\", \r\n              \"usename\":\"fdsfdsfs\", \r\n              \"createddate\":\"5656665\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "tamarijewellersapi.godavariwave.com/website_api/postbtobform",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "postbtobform"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Post B2C",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"surname\":\"dfsfs\",\r\n     \"full_name\":\"fgdfdrdr\",\r\n      \"email\":\"ghthf@gmail.com\", \"phn_number\":\"8919514344\", \r\n      \"aadhar_num\":\"7578575725425\",\r\n       \"aadhar_img\":\"\",\r\n        \"pan_number\":\"6885875875\",\r\n         \"pan_img\":\"\",\r\n          \"building_no\":\"57852\",\r\n           \"street\":\"hggre\",\r\n            \"locality\":\"hfdggdfg\",\r\n             \"city\":\"grgrg\",\r\n              \"district\":\"gtfgtg\",\r\n               \"state\":\"gtrgr\",\r\n                \"pincode\":\"55827\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "tamarijewellersapi.godavariwave.com/website_api/postbtocform",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "postbtocform"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Post appointment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\":\"jyyj\",\r\n     \"email\":\"yujytj@gmail.com\", \r\n     \"mobile_number\":\"8919514344\",\r\n      \"date\":\"524\",\r\n       \"time\":\"5424\",\r\n        \"about_appoint\":\"juyi\",\r\n        \"purity\":\"95\",\r\n         \"dimond_type\":\"ipujytj\",\r\n          \"jew_cate\":\"thtyht\",\r\n           \"purpose\":\"ytt\", \r\n           \"subject\":\"tyth\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "tamarijewellersapi.godavariwave.com/website_api/postappointment",
+              "host": [
+                "tamarijewellersapi",
+                "godavariwave",
+                "com"
+              ],
+              "path": [
+                "website_api",
+                "postappointment"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
