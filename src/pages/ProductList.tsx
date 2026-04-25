@@ -864,6 +864,7 @@ export default function ProductList() {
   const [, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [searchParams] = useSearchParams();
   const categoryParam = searchParams.get('category') || '';
+  const genderParam = searchParams.get('gender') || '';
   const searchQuery = searchParams.get('search') || '';
 
   const [filters, setFilters] = useState<FilterState>({
@@ -903,6 +904,19 @@ export default function ProductList() {
             categories: [categoryId]
           }));
         }
+
+        // Set initial gender filter from URL param (e.g. ?gender=Men from "Crafted for Him")
+        if (genderParam) {
+          const normalized =
+            /^m/i.test(genderParam) ? "Men" :
+            /^w|^f/i.test(genderParam) ? "Women" : "";
+          if (normalized) {
+            setFilters(prev => ({
+              ...prev,
+              genders: [normalized]
+            }));
+          }
+        }
       } catch (err) {
         setError('Failed to load data');
         console.error('Error fetching data:', err);
@@ -912,7 +926,7 @@ export default function ProductList() {
     };
 
     fetchData();
-  }, [categoryParam]);
+  }, [categoryParam, genderParam]);
 
   // Once products load, align min/max price filters to the catalog's actual range
   // (only if the user hasn't touched them yet — detected by checking they're still at the initial 0)

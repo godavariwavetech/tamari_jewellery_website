@@ -596,6 +596,9 @@ function CraftedSection({ w }: { w: number }) {
   const isTablet = w >= 768 && w < 1200;
   const isDesktop = w >= 1200;
   const isMobile = w < 768;
+  const navigate = useNavigate();
+  const goToGender = (gender: "Men" | "Women") =>
+    navigate(`/products?gender=${gender}`);
 
   return (
     <section
@@ -640,6 +643,12 @@ function CraftedSection({ w }: { w: number }) {
       >
         {/* ================= HIM ================= */}
         <div
+          onClick={() => goToGender("Men")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") goToGender("Men");
+          }}
           style={{
             position: isMobile ? "relative" : "absolute",
             left: isMobile ? "auto" : "3%",
@@ -648,6 +657,7 @@ function CraftedSection({ w }: { w: number }) {
             flexDirection: "column",
             alignItems: "center",
             width: isMobile ? "100%" : "auto",
+            cursor: "pointer",
           }}
         >
           {/* ✅ Image with NO styling */}
@@ -697,6 +707,12 @@ function CraftedSection({ w }: { w: number }) {
 
         {/* ================= HER ================= */}
         <div
+          onClick={() => goToGender("Women")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") goToGender("Women");
+          }}
           style={{
             position: isMobile ? "relative" : "absolute",
             right: isMobile ? "auto" : "3%",
@@ -705,6 +721,7 @@ function CraftedSection({ w }: { w: number }) {
             flexDirection: "column",
             alignItems: "center",
             width: isMobile ? "100%" : "auto",
+            cursor: "pointer",
           }}
         >
           {/* Label */}
