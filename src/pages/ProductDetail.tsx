@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { apiService, type ProductDetail as ProductDetailType, type Product } from "../services/api";
+import { authService } from "../services/auth";
+import { useCurrency } from "../context/CurrencyContext";
+import {
+  dispatchCartUpdate,
+  getWishlistProductMap,
+  toggleWishlistWithUpdate,
+  WISHLIST_UPDATE_EVENT,
+} from "../utils/cartUtils";
 import productImg from "../assets/product.png";
 import { Link } from "react-router-dom";
 
@@ -82,6 +90,8 @@ const THUMBS = [productImg, productImg, productImg, productImg];
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { format } = useCurrency(); // INR → active currency (INR/USD)
   const [product, setProduct] = useState<ProductDetailType | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +103,89 @@ export default function ProductDetail() {
   const [tab, setTab] = useState("description");
   const [reviews, setReviews] = useState<any[]>([]);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [cartBusy, setCartBusy] = useState(false);
+  const [cartMsg, setCartMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const [inWishlist, setInWishlist] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    let cancelled = false;
+    const sync = async () => {
+      if (!authService.isAuthenticated()) {
+        setInWishlist(!!product.is_wishlist);
+        return;
+      }
+      const map = await getWishlistProductMap();
+      if (!cancelled) setInWishlist(map.has(product.id));
+    };
+    sync();
+    const refresh = () => sync();
+    window.addEventListener(WISHLIST_UPDATE_EVENT, refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(WISHLIST_UPDATE_EVENT, refresh);
+    };
+  }, [product?.id, product?.is_wishlist]);
+
+  const handleWishlistToggle = async () => {
+    if (!product?.id) return;
+    if (!authService.isAuthenticated()) {
+      navigate('/login');
+      return;
+    }
+    setWishlistBusy(true);
+    const previous = inWishlist;
+    setInWishlist(!previous);
+    const res = await toggleWishlistWithUpdate(product.id);
+    if (!res.success) {
+      setInWishlist(previous);
+      setCartMsg({ text: res.message || 'Failed to update wishlist', kind: 'err' });
+      setTimeout(() => setCartMsg(null), 2500);
+    }
+    setWishlistBusy(false);
+  };
+
+  const handleAddToCart = async () => {
+    if (!product?.id) return;
+    const user = authService.getCurrentUser();
+    if (!user?.id) {
+      navigate('/login');
+      return;
+    }
+    setCartBusy(true);
+    setCartMsg(null);
+    try {
+      const res = await apiService.addToCart(user.id, product.id, 1, 0, user.role);
+      if (res.success) {
+        dispatchCartUpdate();
+        setCartMsg({ text: 'Added to cart', kind: 'ok' });
+      } else if (res.alreadyExists) {
+        setCartMsg({ text: res.message || 'Already in your cart', kind: 'err' });
+      } else {
+        setCartMsg({ text: res.message || 'Could not add to cart', kind: 'err' });
+      }
+    } finally {
+      setCartBusy(false);
+      setTimeout(() => setCartMsg(null), 2500);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!product?.id) return;
+    const user = authService.getCurrentUser();
+    if (!user?.id) {
+      navigate('/login');
+      return;
+    }
+    const res = await apiService.addToCart(user.id, product.id, 1, 0, user.role);
+    if (res.success || res.alreadyExists) {
+      dispatchCartUpdate();
+      navigate('/cart');
+    } else {
+      setCartMsg({ text: res.message || 'Could not start checkout', kind: 'err' });
+    }
+  };
 
   const [showPriceBreakup, setShowPriceBreakup] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
@@ -235,7 +328,7 @@ export default function ProductDetail() {
         }
       `}</style>
       <div style={{ minHeight: "100vh", background: "#f9f9f7", fontFamily: SF }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "20px 16px 40px" : "28px 24px 60px" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile ? "20px 16px 40px" : "28px 24px 60px" }}>
 
           {/* ── Breadcrumb ── */}
           <nav style={{ marginBottom: 16 }}>
@@ -550,9 +643,9 @@ export default function ProductDetail() {
                 {product?.product_name || "Product"}
               </h1>
 
-              {/* Price */}
+              {/* Price — formatted per active currency (INR/USD) via CurrencyContext */}
               <p style={{ fontSize: isMobile ? 26 : 32, fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>
-                ₹ {product?.price ? product.price.toLocaleString('en-IN') : 'Price not available'}
+                {product?.price ? format(product.price, { inputIncludesGst: true }) : 'Price not available'}
               </p>
               <p style={{ fontSize: 13, color: GOLD, fontWeight: 600, margin: "0 0 22px", textDecoration: "underline", cursor: "pointer" }}
                 onClick={() => setShowPriceBreakup(!showPriceBreakup)}>SEE PRICE BREAKUP</p>
@@ -671,32 +764,78 @@ export default function ProductDetail() {
               </div>
 
               {/* CTA buttons */}
-              <div className="mobile-stack" style={{ display: "flex", gap: 12, marginBottom: 14, flexDirection: isMobile ? 'column' : 'row' }}>
-                <button style={{
-                  flex: 1, padding: "14px 0", borderRadius: 10,
-                  background: "#fff", border: `2px solid ${GOLD}`,
-                  color: GOLD, fontSize: 14, fontWeight: 700,
-                  letterSpacing: 0.5, cursor: "pointer",
-                  transition: "background 0.15s",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.background = GOLD_L}
+              <div className="mobile-stack" style={{ display: "flex", gap: 12, marginBottom: 14, flexDirection: isMobile ? 'column' : 'row', alignItems: 'stretch' }}>
+                <button
+                  onClick={handleWishlistToggle}
+                  disabled={wishlistBusy}
+                  aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                  title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                  style={{
+                    width: isMobile ? '100%' : 52,
+                    padding: isMobile ? "12px 0" : 0,
+                    borderRadius: 10,
+                    background: inWishlist ? '#fef2f2' : '#fff',
+                    border: `2px solid ${inWishlist ? '#ef4444' : '#e5e7eb'}`,
+                    color: inWishlist ? '#ef4444' : '#6b7280',
+                    cursor: wishlistBusy ? "not-allowed" : "pointer",
+                    opacity: wishlistBusy ? 0.6 : 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: 8,
+                    fontSize: 13, fontWeight: 700, letterSpacing: 0.5,
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill={inWishlist ? "#ef4444" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  {isMobile && (inWishlist ? 'SAVED' : 'WISHLIST')}
+                </button>
+                <button
+                  onClick={handleAddToCart}
+                  disabled={cartBusy}
+                  style={{
+                    flex: 1, padding: "14px 0", borderRadius: 10,
+                    background: "#fff", border: `2px solid ${GOLD}`,
+                    color: GOLD, fontSize: 14, fontWeight: 700,
+                    letterSpacing: 0.5, cursor: cartBusy ? "not-allowed" : "pointer",
+                    opacity: cartBusy ? 0.7 : 1,
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => { if (!cartBusy) e.currentTarget.style.background = GOLD_L; }}
                   onMouseLeave={e => e.currentTarget.style.background = "#fff"}
                 >
-                  ADD TO CART
+                  {cartBusy ? 'ADDING…' : 'ADD TO CART'}
                 </button>
-                <button style={{
-                  flex: 1, padding: "14px 0", borderRadius: 10,
-                  background: GOLD, border: "none",
-                  color: "#fff", fontSize: 14, fontWeight: 700,
-                  letterSpacing: 0.5, cursor: "pointer",
-                  transition: "background 0.15s",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#c8900e"}
+                <button
+                  onClick={handleBuyNow}
+                  disabled={cartBusy}
+                  style={{
+                    flex: 1, padding: "14px 0", borderRadius: 10,
+                    background: GOLD, border: "none",
+                    color: "#fff", fontSize: 14, fontWeight: 700,
+                    letterSpacing: 0.5, cursor: cartBusy ? "not-allowed" : "pointer",
+                    opacity: cartBusy ? 0.7 : 1,
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => { if (!cartBusy) e.currentTarget.style.background = "#c8900e"; }}
                   onMouseLeave={e => e.currentTarget.style.background = GOLD}
                 >
                   BUY NOW
                 </button>
               </div>
+              {cartMsg && (
+                <div style={{
+                  marginBottom: 12,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: cartMsg.kind === 'ok' ? '#dcfce7' : '#fee2e2',
+                  color: cartMsg.kind === 'ok' ? '#166534' : '#991b1b',
+                }}>
+                  {cartMsg.text}
+                </div>
+              )}
 
               {/* Shipping & Enquiry */}
               <div className="mobile-stack" style={{ display: "flex", gap: 18, marginBottom: 22, flexWrap: 'wrap' }}>
@@ -784,8 +923,8 @@ export default function ProductDetail() {
                     </p>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
-                        {relatedProducts.length > 0 
-                          ? `₹${(p as Product).price?.toLocaleString('en-IN') || '0'}` 
+                        {relatedProducts.length > 0
+                          ? format((p as Product).price || 0, { inputIncludesGst: true })
                           : (p as typeof SIMILAR[0]).price
                         }
                       </span>

@@ -1,4 +1,5 @@
-const BASE_URL = 'https://tamarijewellersapi.godavariwave.com/website_api';
+const BASE_URL = import.meta.env.VITE_BASE_URL  || 'https://tamarijewellersapi.godavariwave.com/website_api';
+
 
 // API Response Types
 export interface Category {
@@ -24,14 +25,20 @@ export interface Product {
   id: number;
   product_name: string;
   product_image: string;
+  product_image_hover?: string;
   price: number;
   total_price?: number; // Add this optional field
   category_id: number;
+  category_name?: string;
   subcategory_id?: number;
+  subcategory_name?: string;
   description?: string;
   images?: string[];
   specifications?: any;
   material_color?: string;
+  metal_name?: string;
+  has_diamond?: number;
+  gender?: string;
 }
 
 export interface ProductDetail extends Product {
@@ -109,39 +116,48 @@ export interface Review {
   created_at: string;
 }
 
+export type AccountRole = 'b2c' | 'b2b';
+
 export interface LoginResponse {
   success: boolean;
   message: string;
   user_id?: number;
   token?: string;
+  role?: AccountRole;
+  name?: string;
+  email?: string;
 }
 
 // API Functions
 export const apiService = {
   // Authentication
   // Check User Status
-  async checkUserStatus(phone: string): Promise<any> {
+  async checkUserStatus(phone: string): Promise<{ success: boolean; status: 'registered' | 'not_registered' | 'pending'; accounts: Array<'b2c' | 'b2b'>; message: string }> {
     try {
       const response = await fetch(`${BASE_URL}/checkuserstatus`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      return response.json();
+
+      const data = await response.json();
+      return {
+        success: !!data.success,
+        status: data.status,
+        accounts: Array.isArray(data.accounts) ? data.accounts : [],
+        message: data.message || '',
+      };
     } catch (error) {
       console.error('Failed to check user status:', error);
-      // Return a mock response for development
       return {
         success: true,
-        status: 'not_registered', // 'registered', 'pending', 'not_registered'
-        message: 'User not found. Please signup first.'
+        status: 'not_registered',
+        accounts: [],
+        message: 'User not found. Please signup first.',
       };
     }
   },
@@ -153,49 +169,80 @@ export const apiService = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ customer_mobile_number: phone, phone }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      return response.json();
+
+      const data = await response.json();
+      return {
+        success: data.status === 200,
+        message: data.message || 'OTP sent',
+        user_ind: data.user_ind,
+        loginotp: data.loginotp,
+      };
     } catch (error) {
       console.error('Failed to send OTP:', error);
-      // Return a mock success response for development
       return {
         success: true,
         message: 'OTP sent successfully (Demo Mode)',
-        otp: '123456' // For development only
+        otp: '123456'
       };
     }
   },
 
-  async customerLogin(phone: string, otp: string): Promise<LoginResponse> {
+  async customerLogin(phone: string, otp: string, role: AccountRole = 'b2c'): Promise<LoginResponse> {
     try {
       const response = await fetch(`${BASE_URL}/customerlogin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({
+          customer_mobile_number: phone,
+          customer_otp: otp,
+          phone,
+          otp,
+          role,
+          account_type: role,
+        }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      return response.json();
+
+      const data = await response.json();
+
+      if (data.status === 200 && (data.success || data.user_id || data.data?.customer_id)) {
+        const customerId = data.user_id ?? data.data?.customer_id;
+        const resolvedRole: AccountRole = (data.role || data.data?.role || role) === 'b2b' ? 'b2b' : 'b2c';
+        return {
+          success: true,
+          message: data.message || 'Login successful',
+          user_id: customerId,
+          token: data.token || `sess-${resolvedRole}-${customerId}-${Date.now()}`,
+          role: resolvedRole,
+          name: data.data?.customer_name || '',
+          email: data.data?.customer_email || '',
+        };
+      }
+
+      return {
+        success: false,
+        message: data.message || 'Invalid OTP',
+      };
     } catch (error) {
       console.error('Failed to login:', error);
-      // Return a mock success response for development
       if (otp === '123456') {
         return {
           success: true,
           message: 'Login successful (Demo Mode)',
           user_id: 123,
-          token: 'demo_token_456'
+          token: 'demo_token_456',
+          role,
         };
       } else {
         return {
@@ -399,10 +446,16 @@ export const apiService = {
         id: p.id || p.product_id,
         product_name: p.product_name,
         product_image: p.product_main_image || p.product_image,
+        product_image_hover: p.image1 || p.image2 || p.image3 || undefined,
         price: p.total_price || p.price || 0,
         category_id: p.category_id,
+        category_name: p.category_name,
         subcategory_id: p.subcategory_id,
+        subcategory_name: p.subcategory_name,
         material_color: p.material_color,
+        metal_name: p.metal_name,
+        has_diamond: p.has_diamond,
+        gender: p.gender,
         description: p.product_description || p.description
       }));
       const total = data.total || products.length;
@@ -566,6 +619,7 @@ export const apiService = {
   },
 
   async getProductDetails(productId: number, userId?: number): Promise<ProductDetail> {
+    console.log(userId,"userrrrid")
     try {
       const response = await fetch(`${BASE_URL}/getproductdetails`, {
         method: 'POST',
@@ -828,11 +882,20 @@ export const apiService = {
   },
 
   // Orders
+  //   Captures the currency the user was shopping in + the rate at that moment.
+  //   The backend stores these on order_lst_t.order_currency / exchange_rate_at_order.
+  //   Amount columns are still in INR — these two fields are historical metadata so
+  //   the order can be correctly repriced, reported (FIRC), and later settled through
+  //   Razorpay International without any data migration.
   async placeOrder(orderData: {
     userId: number;
     items: any[];
     totalAmount: number;
     deliveryAddress: string;
+    /** ISO 4217 code the user was viewing, e.g. 'INR' or 'USD'. Defaults to INR server-side if omitted. */
+    order_currency?: string;
+    /** 1 INR = X of order_currency at checkout. Defaults to 1 server-side for INR. */
+    exchange_rate_at_order?: number;
   }): Promise<any> {
     const response = await fetch(`${BASE_URL}/orderplaced`, {
       method: 'POST',
@@ -922,16 +985,27 @@ export const apiService = {
   },
 
   // User Profile
-  async getUserProfile(userId: number): Promise<UserProfile | null> {
+  async getUserProfile(userId: number, role: AccountRole = 'b2c'): Promise<UserProfile | null> {
     try {
-      const response = await fetch(`${BASE_URL}/getuserprofile`, {
+      const response = await fetch(`${BASE_URL}/userprofiledetails`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ user_id: userId, userId, role, account_type: role }),
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      return data.data?.[0] || data.data || null;
+      const row = data.data?.[0] || data.data || null;
+      if (!row) return null;
+      return {
+        id: row.id ?? userId,
+        name: row.customer_name || row.name || row.legal_buss_name || '',
+        email: row.customer_email || row.email || '',
+        phone: row.customer_mobile_number || row.phone || '',
+        address: row.address,
+        city: row.city,
+        state: row.state,
+        pincode: row.pincode,
+      };
     } catch (error) {
       console.warn('Failed to fetch user profile:', error);
       return null;
@@ -956,83 +1030,153 @@ export const apiService = {
   },
 
   // Cart
-  async addToCart(userId: number, productId: number, quantity: number = 1): Promise<any> {
-    const response = await fetch(`${BASE_URL}/addusercartitems`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId, productId, quantity }),
-    });
-    return response.json();
+  async addToCart(userId: number, productId: number, quantity: number = 1, sizeId: number = 0, role: AccountRole = 'b2c'): Promise<any> {
+    try {
+      const response = await fetch(`${BASE_URL}/addusercartitems`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          product_id: productId,
+          size_id: sizeId,
+          quantity,
+          role,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 409 || data.code === 'ITEM_ALREADY_EXISTS') {
+        return { success: false, alreadyExists: true, message: data.message || 'Item already in cart' };
+      }
+      return {
+        success: response.ok && data.status === 200,
+        message: data.message,
+        data: data.data,
+      };
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      return { success: false, message: 'Failed to add to cart' };
+    }
   },
 
-  async getCartItems(userId: number): Promise<any> {
-    const response = await fetch(`${BASE_URL}/getusercartitems`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId }),
-    });
-    return response.json();
+  async getCartItems(userId: number, role: AccountRole = 'b2c'): Promise<any> {
+    try {
+      const response = await fetch(`${BASE_URL}/getusercartitems`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, role }),
+      });
+      const data = await response.json();
+      const rows = Array.isArray(data.data) ? data.data : [];
+      return {
+        success: data.status === 200,
+        data: rows.map((item: any) => ({
+          ...item,
+          product_image: item.product_main_image || item.product_image,
+          price: item.total_price ?? item.price ?? 0,
+        })),
+      };
+    } catch (error) {
+      console.error('Failed to fetch cart items:', error);
+      return { success: false, data: [] };
+    }
   },
 
-  async deleteCartItem(userId: number, cartItemId: number): Promise<any> {
-    const response = await fetch(`${BASE_URL}/deleteusercartitems`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId, cartItemId }),
-    });
-    return response.json();
+  async deleteCartItem(_userId: number, cartItemId: number): Promise<any> {
+    try {
+      const response = await fetch(`${BASE_URL}/deleteusercartitems`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cart_id: cartItemId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      return { success: response.ok && data.status === 200, data: data.data };
+    } catch (error) {
+      console.error('Failed to delete cart item:', error);
+      return { success: false };
+    }
   },
 
-  async getCartCount(userId: number): Promise<number> {
-    const response = await fetch(`${BASE_URL}/getcartcount`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId }),
-    });
-    const data = await response.json();
-    return data.data?.count || data.count || 0;
+  async getCartCount(userId: number, role: AccountRole = 'b2c'): Promise<number> {
+    try {
+      const response = await fetch(`${BASE_URL}/getcartcount`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, role }),
+      });
+      const data = await response.json();
+      return Number(data.data?.[0]?.items ?? data.data?.items ?? data.count ?? 0);
+    } catch (error) {
+      console.warn('Failed to fetch cart count:', error);
+      return 0;
+    }
   },
 
   // Wishlist
-  async addToWishlist(userId: number, productId: number): Promise<any> {
-    const response = await fetch(`${BASE_URL}/adduserwishlist`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId, productId }),
-    });
-    return response.json();
+  async addToWishlist(userId: number, productId: number, sizeId: number = 0, role: AccountRole = 'b2c'): Promise<any> {
+    try {
+      const response = await fetch(`${BASE_URL}/adduserwishlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          product_id: productId,
+          size_id: sizeId,
+          role,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      return {
+        success: response.ok && data.status === 200,
+        alreadyExists: !!data.already_exists,
+        message: data.message,
+        data: data.data,
+      };
+    } catch (error) {
+      console.error('Failed to add to wishlist:', error);
+      return { success: false, message: 'Failed to add to wishlist' };
+    }
   },
 
-  async getWishlist(userId: number): Promise<any> {
-    const response = await fetch(`${BASE_URL}/getuserwishlist`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId }),
-    });
-    return response.json();
+  async getWishlist(userId: number, role: AccountRole = 'b2c'): Promise<any> {
+    try {
+      const response = await fetch(`${BASE_URL}/getuserwishlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, role }),
+      });
+      const data = await response.json();
+      const rows = Array.isArray(data.data) ? data.data : [];
+      return {
+        success: data.status === 200,
+        data: rows.map((item: any) => ({
+          ...item,
+          id: item.wishlist_id ?? item.id,
+          wishlist_id: item.wishlist_id ?? item.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_image: item.product_main_image || item.product_image,
+          price: item.total_price ?? item.price ?? 0,
+        })),
+      };
+    } catch (error) {
+      console.error('Failed to fetch wishlist:', error);
+      return { success: false, data: [] };
+    }
   },
 
-  async deleteWishlistItem(userId: number, wishlistItemId: number): Promise<any> {
-    const response = await fetch(`${BASE_URL}/deleteuserwishlist`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId, wishlistItemId }),
-    });
-    return response.json();
+  async deleteWishlistItem(_userId: number, wishlistItemId: number): Promise<any> {
+    try {
+      const response = await fetch(`${BASE_URL}/deleteuserwishlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wishlist_id: wishlistItemId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      return { success: response.ok && data.status === 200, data: data.data };
+    } catch (error) {
+      console.error('Failed to delete wishlist item:', error);
+      return { success: false };
+    }
   },
 
   // Pricing
@@ -1045,6 +1189,28 @@ export const apiService = {
   async getApplicationData(): Promise<any> {
     const response = await fetch(`${BASE_URL}/getapplicationdata`);
     return response.json();
+  },
+
+  // Currencies — returns every currency marked active in currency_rates_t.
+  //   INR is always first. USD follows. Used by CurrencyContext to
+  //   populate the Header dropdown and compute display conversions.
+  async getCurrencies(): Promise<Array<{ code: string; symbol: string; rate_from_inr: number; decimals: number; locale: string }>> {
+    try {
+      const response = await fetch(`${BASE_URL}/getcurrencies`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const rows = Array.isArray(data.data) ? data.data : [];
+      return rows.map((r: any) => ({
+        code: r.code,
+        symbol: r.symbol,
+        rate_from_inr: Number(r.rate_from_inr),
+        decimals: Number(r.decimals),
+        locale: r.locale,
+      }));
+    } catch (err) {
+      console.warn('Failed to fetch currencies, defaulting to INR only:', err);
+      return [{ code: 'INR', symbol: '₹', rate_from_inr: 1, decimals: 0, locale: 'en-IN' }];
+    }
   },
 
   // B2B Form

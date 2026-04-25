@@ -212,7 +212,7 @@ const Signup = () => {
       setSuccess(true);
       setError(null);
       // Show success message for longer duration
-      setTimeout(() => navigate('/login'), 4000);
+      setTimeout(() => navigate('/login'), 2000);
       
     } catch (err: any) {
       console.error('B2C form submission error:', err);

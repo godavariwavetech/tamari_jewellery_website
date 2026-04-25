@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { apiService, type Order } from '../services/api';
 import { authService } from '../services/auth';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Orders = () => {
+  const { format } = useCurrency();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +127,8 @@ const Orders = () => {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Total Amount</p>
-                        <p className="text-2xl font-bold text-yellow-600">₹{order.total_amount?.toLocaleString('en-IN')}</p>
+                        {/* Total stored in INR; format() converts to the user's selected currency */}
+                        <p className="text-2xl font-bold text-yellow-600">{format(order.total_amount || 0, { inputIncludesGst: true })}</p>
                       </div>
                       <div className="flex gap-3">
                         <button className="border-2 border-yellow-600 text-yellow-600 px-6 py-2 rounded-lg font-semibold hover:bg-yellow-50 transition">

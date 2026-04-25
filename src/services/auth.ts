@@ -1,5 +1,5 @@
 // Authentication service
-import { apiService } from './api';
+import { apiService, type AccountRole } from './api';
 
 export interface User {
   id: number;
@@ -7,6 +7,7 @@ export interface User {
   email: string;
   phone: string;
   token: string;
+  role: AccountRole;
 }
 
 class AuthService {
@@ -22,9 +23,13 @@ class AuthService {
     try {
       const userData = localStorage.getItem('user');
       const token = localStorage.getItem('token');
-      
+
       if (userData && token) {
-        this.user = JSON.parse(userData);
+        const parsed = JSON.parse(userData);
+        this.user = {
+          ...parsed,
+          role: (parsed.role === 'b2b' ? 'b2b' : 'b2c') as AccountRole,
+        };
         this.token = token;
       }
     } catch (error) {
@@ -56,36 +61,38 @@ class AuthService {
     }
   }
 
-  async login(phone: string, otp: string): Promise<{ success: boolean; message: string; user?: User }> {
+  async login(phone: string, otp: string, role: AccountRole = 'b2c'): Promise<{ success: boolean; message: string; user?: User }> {
     try {
-      const response = await apiService.customerLogin(phone, otp);
-      
+      const response = await apiService.customerLogin(phone, otp, role);
+
       if (response.success && response.user_id && response.token) {
+        const resolvedRole: AccountRole = response.role || role;
         const user: User = {
           id: response.user_id,
-          name: '', // Will be filled from profile
-          email: '',
+          name: response.name || '',
+          email: response.email || '',
           phone,
-          token: response.token
+          token: response.token,
+          role: resolvedRole,
         };
-        
+
         this.saveUserToStorage(user, response.token);
-        
-        // Fetch user profile to complete user data
+
+        // Fetch user profile to complete user data (respects role)
         try {
-          const profile = await apiService.getUserProfile(response.user_id);
+          const profile = await apiService.getUserProfile(response.user_id, resolvedRole);
           if (profile) {
-            const updatedUser = { ...user, name: profile.name, email: profile.email };
+            const updatedUser = { ...user, name: profile.name || user.name, email: profile.email || user.email };
             this.saveUserToStorage(updatedUser, response.token);
             return { success: true, message: response.message, user: updatedUser };
           }
         } catch (profileError) {
           console.warn('Could not fetch user profile:', profileError);
         }
-        
+
         return { success: true, message: response.message, user };
       }
-      
+
       return { success: false, message: response.message };
     } catch (error) {
       return { success: false, message: 'Login failed' };

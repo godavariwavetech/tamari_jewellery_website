@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { apiService } from "../services/api";
 import { authService } from "../services/auth";
+import { useCurrency } from "../context/CurrencyContext";
+import { dispatchCartUpdate } from "../utils/cartUtils";
 import product from "../assets/product.png";
 
 const SF = "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif";
@@ -42,9 +44,6 @@ const TrashIcon = () => (
   </svg>
 );
 
-/* ── Initial cart data ── */
-const fmt = (n: number) => "₹" + n.toLocaleString("en-IN");
-
 /* ════════════════════════
    CART ITEM ROW
 ════════════════════════ */
@@ -56,6 +55,9 @@ type CartItemProps = {
 };
 
 function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
+  const { format } = useCurrency(); // formats prices in the selected currency (INR/USD)
+  // Shadow the legacy fmt so all existing `fmt(x)` calls below route through the context.
+  const fmt = (n: number) => format(n, { inputIncludesGst: true });
   const total = item.price * item.quantity;
 
   if (isMobile) {
@@ -66,25 +68,41 @@ function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
         fontFamily: SF,
       }}>
         <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-          <div style={{ 
-            width: 80, 
-            height: 80, 
-            borderRadius: 8, 
-            background: "#f3f4f6", 
-            display: "flex", 
-            alignItems: "center", 
+          <div style={{
+            width: 80,
+            height: 80,
+            borderRadius: 8,
+            background: "#eef0f3",
+            display: "flex",
+            alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
-            overflow: "hidden"
+            overflow: "hidden",
+            padding: 8,
+            boxSizing: "border-box",
           }}>
-            <img src={item.product_image || product} alt="Product Image" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src={item.product_image || product} alt="Product Image" style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }} />
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 6px", lineHeight: 1.4 }}>
               {item.product_name}
             </p>
-            <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 4px" }}>SKU: {item.sku_id || 'N/A'}</p>
-            <p style={{ fontSize: 14, fontWeight: 700, color: GOLD }}>{fmt(item.price)}</p>
+            {item.sku_id && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>SKU: {item.sku_id}</p>}
+            {(item.metal_name || item.material_color) && (
+              <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+                Metal: {[item.metal_name, (item as any).karat ? `${(item as any).karat}KT` : null, item.material_color && `${item.material_color} Gold`].filter(Boolean).join(' ')}
+              </p>
+            )}
+            {item.size && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Size: {item.size}</p>}
+            {(item.diamond_clarity || (item as any).diamond_color) && (
+              <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+                Diamond: {[item.diamond_clarity, (item as any).diamond_color].filter(Boolean).join(' ')}
+              </p>
+            )}
+            {item.gross_weight && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>GWT: {item.gross_weight} gm</p>}
+            {item.net_weight && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>NWT: {item.net_weight} gm</p>}
+            {item.diamond_weight && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>DWT: {item.diamond_weight} cts</p>}
+            <p style={{ fontSize: 14, fontWeight: 700, color: GOLD, marginTop: 6 }}>{fmt(item.price)}</p>
           </div>
         </div>
 
@@ -121,44 +139,54 @@ function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "1fr 100px 140px 100px 80px",
+      gridTemplateColumns: "1fr 120px 160px 120px 80px",
       alignItems: "center",
-      padding: "32px 0",
+      padding: "40px 0",
       borderBottom: "1px solid #e5e7eb",
-      gap: 16,
+      gap: 20,
       fontFamily: SF,
     }}>
       {/* Product */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-        <div style={{ 
-          width: 100, 
-          height: 100, 
-          borderRadius: 8, 
-          background: "#f3f4f6", 
-          display: "flex", 
-          alignItems: "center", 
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 22 }}>
+        <div style={{
+          width: 140,
+          height: 140,
+          borderRadius: 10,
+          background: "#eef0f3",
+          display: "flex",
+          alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
-          overflow: "hidden"
+          overflow: "hidden",
+          padding: 18,
+          boxSizing: "border-box",
         }}>
-          <img src={item.product_image || product} alt="Product Image" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={item.product_image || product} alt="Product Image" style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }} />
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "#111827", margin: 0, lineHeight: 1.4 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 2px", lineHeight: 1.35 }}>
             {item.product_name}
           </p>
-          <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>SKU: {item.sku_id || 'N/A'}</p>
-          {item.metal_name && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Metal: {item.metal_name} {item.material_color}</p>}
-          {item.size && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Size: {item.size}</p>}
-          {item.diamond_clarity && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Diamond: {item.diamond_clarity}</p>}
-          {item.gross_weight && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>GWT: {item.gross_weight}</p>}
-          {item.net_weight && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>NWT: {item.net_weight}</p>}
-          {item.diamond_weight && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>DWT: {item.diamond_weight}</p>}
+          {item.sku_id && <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>SKU: {item.sku_id}</p>}
+          {(item.metal_name || item.material_color) && (
+            <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>
+              Metal: {[item.metal_name, (item as any).karat ? `${(item as any).karat}KT` : null, item.material_color && `${item.material_color} Gold`].filter(Boolean).join(' ')}
+            </p>
+          )}
+          {item.size && <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>Size: {item.size}</p>}
+          {(item.diamond_clarity || (item as any).diamond_color) && (
+            <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>
+              Diamond: {[item.diamond_clarity, (item as any).diamond_color].filter(Boolean).join(' ')}
+            </p>
+          )}
+          {item.gross_weight && <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>GWT: {item.gross_weight} gm</p>}
+          {item.net_weight && <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>NWT: {item.net_weight} gm</p>}
+          {item.diamond_weight && <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>DWT: {item.diamond_weight} cts</p>}
         </div>
       </div>
 
       {/* Unit Price */}
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", textAlign: "center" }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", textAlign: "center" }}>
         {fmt(item.price)}
       </div>
 
@@ -166,27 +194,27 @@ function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div style={{
           display: "flex", alignItems: "center",
-          border: "1px solid #d1d5db", borderRadius: 6,
+          border: "1px solid #d1d5db", borderRadius: 8,
           overflow: "hidden", userSelect: "none",
         }}>
           <button
             onClick={() => onQtyChange(item.id, Math.max(1, item.quantity - 1))}
             style={{
-              width: 30, height: 30, background: "#fff", border: "none",
-              fontSize: 18, cursor: "pointer", color: "#374151",
+              width: 36, height: 36, background: "#fff", border: "none",
+              fontSize: 20, cursor: "pointer", color: "#374151",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >−</button>
           <span style={{
-            minWidth: 32, textAlign: "center", fontSize: 13, fontWeight: 600,
+            minWidth: 40, textAlign: "center", fontSize: 15, fontWeight: 600,
             color: "#111827", borderLeft: "1px solid #d1d5db", borderRight: "1px solid #d1d5db",
-            padding: "0 8px", lineHeight: "30px",
+            padding: "0 10px", lineHeight: "36px",
           }}>{item.quantity}</span>
           <button
             onClick={() => onQtyChange(item.id, item.quantity + 1)}
             style={{
-              width: 30, height: 30, background: "#fff", border: "none",
-              fontSize: 18, cursor: "pointer", color: "#374151",
+              width: 36, height: 36, background: "#fff", border: "none",
+              fontSize: 20, cursor: "pointer", color: "#374151",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >+</button>
@@ -194,7 +222,7 @@ function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
       </div>
 
       {/* Item Total */}
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", textAlign: "center" }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", textAlign: "center" }}>
         {fmt(total)}
       </div>
 
@@ -218,13 +246,15 @@ function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
    SUMMARY PANEL
 ════════════════════════ */
 function Summary({ subtotal, isMobile }: { subtotal: number; isMobile?: boolean }) {
+  const { format, isForeign } = useCurrency();
+  const fmt = (n: number) => format(n, { inputIncludesGst: true });
   return (
     <div style={{
       borderRadius: 14, overflow: "hidden",
       border: "1px solid #e5e7eb",
       position: isMobile ? 'static' : "sticky", top: 24,
       fontFamily: SF,
-      marginTop: isMobile ? 24 : 0
+      marginTop: isMobile ? 24 : 10
     }}>
       {/* Gold header */}
       <div style={{
@@ -235,7 +265,7 @@ function Summary({ subtotal, isMobile }: { subtotal: number; isMobile?: boolean 
         </h2>
       </div>
 
-      <div style={{ background: "#fff", padding: "20px 20px 24px" }}>
+      <div style={{ background: "#FCF7E8", padding: "20px 20px 24px" }}>
         {[
           { label: "Subtotal",     value: fmt(subtotal) },
           { label: "Shipping Fee", value: "₹0" },
@@ -255,6 +285,16 @@ function Summary({ subtotal, isMobile }: { subtotal: number; isMobile?: boolean 
           <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Order Total</span>
           <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>{fmt(subtotal)}</span>
         </div>
+
+        {/* When viewing in a foreign currency, show a note — Indian GST doesn't apply to international orders */}
+        {isForeign && (
+          <div style={{
+            fontSize: 11, color: "#6b7280", marginTop: -12, marginBottom: 14,
+            padding: 8, background: "#f9f9f7", borderRadius: 6, lineHeight: 1.5,
+          }}>
+            Prices shown exclude 3% Indian GST (not applicable to international orders). Final charge at checkout is billed in INR.
+          </div>
+        )}
 
         <button style={{
           width: "100%", background: GOLD, color: "#fff",
@@ -297,7 +337,7 @@ export default function Cart() {
 
     try {
       setLoading(true);
-      const response = await apiService.getCartItems(user.id);
+      const response = await apiService.getCartItems(user.id, user.role);
       if (response.success && response.data) {
         const cartItems: CartItem[] = response.data.map((item: any) => ({
           id: item.id,
@@ -338,7 +378,7 @@ export default function Cart() {
       // Then update on server
       const item = items.find(i => i.id === id);
       if (item) {
-        await apiService.addToCart(user.id, item.product_id, qty);
+        await apiService.addToCart(user.id, item.product_id, qty, 0, user.role);
       }
     } catch (error) {
       console.error('Failed to update quantity:', error);
@@ -351,22 +391,20 @@ export default function Cart() {
     const user = authService.getCurrentUser();
     if (!user) return;
 
-    try {
-      // Update locally first
-      setItems(prev => prev.filter(i => i.id !== id));
-      
-      // Then remove from server
-      await apiService.deleteCartItem(user.id, id);
-    } catch (error) {
-      console.error('Failed to remove item:', error);
-      // Revert on error
-      fetchCartItems();
+    const previous = items;
+    setItems(prev => prev.filter(i => i.id !== id));
+
+    const res = await apiService.deleteCartItem(user.id, id);
+    if (res.success) {
+      dispatchCartUpdate();
+    } else {
+      setItems(previous);
     }
   };
 
   const subtotal = items.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
-  const COL = { fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 1, textTransform: "uppercase" };
+  const COL = { fontSize: 13, fontWeight: 700, color: "#111827", letterSpacing: 1, textTransform: "uppercase" };
 
   if (loading) {
     return (
@@ -426,11 +464,11 @@ export default function Cart() {
         minHeight: "100vh", background: "#f9f9f7",
         padding: isMobile ? "24px 16px" : "40px 40px 60px", fontFamily: SF,
       }}>
-        <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
 
           <h1 style={{
             fontSize: isMobile ? 24 : 28, fontWeight: 700, color: "#111827",
-            textAlign: "center", margin: "0 0 32px", letterSpacing: -0.3,
+            textAlign: "center", margin: isMobile ? "0 0 32px" : "0 0 56px", letterSpacing: -0.3,
           }}>
             Shopping in Cart
           </h1>
@@ -442,9 +480,11 @@ export default function Cart() {
               {!isMobile && (
                 <div style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 100px 140px 100px 80px",
-                  gap: 16, padding: "0 0 14px",
+                  gridTemplateColumns: "1fr 120px 160px 120px 80px",
+                  alignItems: "center",
+                  gap: 20, padding: "0 0 14px",
                   borderBottom: "1.5px solid #e5e7eb",
+                  marginTop:"20px"
                 }}>
                   <div style={COL}>Product</div>
                   <div style={{ ...COL, textAlign: "center" }}>Unit Price</div>

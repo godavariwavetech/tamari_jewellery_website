@@ -325,8 +325,8 @@ export default function TamiriFooter() {
             </div>
 
             {/* Payment Icons */}
-            <div>
-              <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", marginBottom: "6px" }}>
+            <div style={{marginTop:"130px"}}>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", marginBottom: "px" }}>
                 <VisaIcon />
                 <MastercardIcon />
                 <RupayIcon />

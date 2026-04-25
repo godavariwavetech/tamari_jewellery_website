@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { apiService, type Product, type CategoryWithSubcategories } from "../services/api";
+import { authService } from "../services/auth";
+import { useCurrency } from "../context/CurrencyContext";
+import {
+  WISHLIST_UPDATE_EVENT,
+  getWishlistProductMap,
+  toggleWishlistWithUpdate,
+  dispatchCartUpdate,
+} from "../utils/cartUtils";
 
 const SF = "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif";
 const GOLD = "#c9a84c";
@@ -11,15 +19,23 @@ const ChevDown = ({ size = 14 }) => (
 );
 
 /* ── Filter sections data ── */
-const GOLD_TYPES = [
-  { label: "Rose Gold", checked: false },
-  { label: "White Gold", checked: false },
-  { label: "Yellow Gold", checked: false },
-];
+const GOLD_TYPES = ["Rose Gold", "White Gold", "Yellow Gold"];
+const GENDERS = ["Women", "Men"];
+
+// Accept either "Women"/"Female" or "Men"/"Male" in DB
+const matchGender = (productGender: string, filter: string) => {
+  const p = (productGender || "").toLowerCase();
+  const f = filter.toLowerCase();
+  if (f === "women") return p === "women" || p === "female";
+  if (f === "men") return p === "men" || p === "male";
+  return p === f;
+};
+const JEWELLERY_TYPES = ["Gold", "Diamonds", "Gold & Diamonds"];
 
 interface FilterState {
   categories: number[];
   subcategories: number[];
+  genders: string[];
   jewelleryTypes: string[];
   goldTypes: string[];
   minPrice: number;
@@ -83,7 +99,7 @@ function CheckRow({ label, checked, count, onClick }: { label: string; checked: 
         </div>
         <span style={{ fontFamily: SF, fontSize: 13, color: "#374151" }}>{label}</span>
       </div>
-      {count && <span style={{ fontFamily: SF, fontSize: 12, color: "#9ca3af" }}>({count})</span>}
+      {count != null && <span style={{ fontFamily: SF, fontSize: 12, fontWeight: 600, color: "#111827" }}>({count})</span>}
     </label>
   );
 }
@@ -91,20 +107,26 @@ function CheckRow({ label, checked, count, onClick }: { label: string; checked: 
 /* ════════════════════════
    SIDEBAR
 ════════════════════════ */
-function Sidebar({ 
-  categories, 
-  filters, 
-  onFiltersChange 
-}: { 
-  categories: CategoryWithSubcategories[]; 
+function Sidebar({
+  allProducts,
+  filters,
+  onFiltersChange
+}: {
+  allProducts: Product[];
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
 }) {
   const [priceRangeOpen, setPriceRangeOpen] = useState(true);
   const [sortByOpen, setSortByOpen] = useState(true);
 
-  const maxPrice = 1000000;
-  const minPriceLimit = 10000;
+  // Slider bounds derived from the actual product catalog
+  const pricedProducts = allProducts.filter(p => (p.price || 0) > 0);
+  const minPriceLimit = pricedProducts.length > 0
+    ? Math.floor(Math.min(...pricedProducts.map(p => p.price)))
+    : 0;
+  const maxPrice = pricedProducts.length > 0
+    ? Math.ceil(Math.max(...pricedProducts.map(p => p.price), minPriceLimit + 100000))
+    : 100000;
   
   const sliderPct = ((filters.minPrice - minPriceLimit) / (maxPrice - minPriceLimit)) * 100;
 
@@ -138,12 +160,121 @@ function Sidebar({
     const newTypes = filters.goldTypes.includes(type)
       ? filters.goldTypes.filter(t => t !== type)
       : [...filters.goldTypes, type];
-    
+
     onFiltersChange({
       ...filters,
       goldTypes: newTypes
     });
   };
+
+  const handleGenderToggle = (g: string) => {
+    const next = filters.genders.includes(g)
+      ? filters.genders.filter(x => x !== g)
+      : [...filters.genders, g];
+    onFiltersChange({ ...filters, genders: next });
+  };
+
+  const handleJewelleryTypeToggle = (t: string) => {
+    const next = filters.jewelleryTypes.includes(t)
+      ? filters.jewelleryTypes.filter(x => x !== t)
+      : [...filters.jewelleryTypes, t];
+    onFiltersChange({ ...filters, jewelleryTypes: next });
+  };
+
+  // Match helpers (same logic used by the main filter pipeline)
+  const matchesCategory = (p: Product) =>
+    filters.categories.length === 0 || filters.categories.includes(p.category_id);
+  const matchesSubcategory = (p: Product) =>
+    filters.subcategories.length === 0 ||
+    (p.subcategory_id != null && filters.subcategories.includes(p.subcategory_id));
+  const matchesGenderF = (p: Product) =>
+    filters.genders.length === 0 ||
+    filters.genders.some(sel => matchGender(p.gender || "", sel));
+  const matchesJewelleryType = (p: Product) => {
+    if (filters.jewelleryTypes.length === 0) return true;
+    const metal = (p.metal_name || "").toLowerCase();
+    const hasDiamond = Number(p.has_diamond) === 1;
+    return filters.jewelleryTypes.some(t => {
+      if (t === "Gold") return metal.includes("gold");
+      if (t === "Diamonds") return hasDiamond;
+      if (t === "Gold & Diamonds") return metal.includes("gold") && hasDiamond;
+      return false;
+    });
+  };
+  const matchesGoldType = (p: Product) => {
+    if (filters.goldTypes.length === 0) return true;
+    const c = (p.material_color || "").toLowerCase();
+    return filters.goldTypes.some(g => {
+      if (g === "Rose Gold") return c.includes("rose") || c.includes("pink");
+      if (g === "White Gold") return c.includes("white");
+      if (g === "Yellow Gold") return c.includes("yellow");
+      return false;
+    });
+  };
+  const matchesPrice = (p: Product) => {
+    if (filters.minPrice > 0 && p.price < filters.minPrice) return false;
+    if (filters.maxPrice > 0 && p.price > filters.maxPrice) return false;
+    return true;
+  };
+
+  // Faceted counts — each section's count reflects "adding this option on top of the current filters".
+  // i.e. we apply every OTHER section's filter, then count how many of those match this option.
+  const countCategory = (id: number) =>
+    allProducts.filter(p =>
+      p.category_id === id &&
+      matchesSubcategory(p) && matchesGenderF(p) && matchesJewelleryType(p) && matchesGoldType(p) && matchesPrice(p)
+    ).length;
+  const countSubcategory = (id: number) =>
+    allProducts.filter(p =>
+      p.subcategory_id === id &&
+      matchesCategory(p) && matchesGenderF(p) && matchesJewelleryType(p) && matchesGoldType(p) && matchesPrice(p)
+    ).length;
+  const countGender = (g: string) =>
+    allProducts.filter(p =>
+      matchGender(p.gender || "", g) &&
+      matchesCategory(p) && matchesSubcategory(p) && matchesJewelleryType(p) && matchesGoldType(p) && matchesPrice(p)
+    ).length;
+  const countJewelleryType = (t: string) => {
+    return allProducts.filter(p => {
+      const metal = (p.metal_name || "").toLowerCase();
+      const hasDiamond = Number(p.has_diamond) === 1;
+      let ok = false;
+      if (t === "Gold") ok = metal.includes("gold");
+      else if (t === "Diamonds") ok = hasDiamond;
+      else if (t === "Gold & Diamonds") ok = metal.includes("gold") && hasDiamond;
+      return ok && matchesCategory(p) && matchesSubcategory(p) && matchesGenderF(p) && matchesGoldType(p) && matchesPrice(p);
+    }).length;
+  };
+  const countGoldType = (g: string) => {
+    return allProducts.filter(p => {
+      const c = (p.material_color || "").toLowerCase();
+      let ok = false;
+      if (g === "Rose Gold") ok = c.includes("rose") || c.includes("pink");
+      else if (g === "White Gold") ok = c.includes("white");
+      else if (g === "Yellow Gold") ok = c.includes("yellow");
+      return ok && matchesCategory(p) && matchesSubcategory(p) && matchesGenderF(p) && matchesJewelleryType(p) && matchesPrice(p);
+    }).length;
+  };
+
+  // Build the Category + Subcategory option lists from the actual product data,
+  // using the names returned by the getproducts JOIN. Only categories/subs that have products appear.
+  const productCategories = Array.from(
+    allProducts.reduce((map, p) => {
+      if (p.category_id != null && !map.has(p.category_id)) {
+        map.set(p.category_id, p.category_name || `Category ${p.category_id}`);
+      }
+      return map;
+    }, new Map<number, string>())
+  ).map(([id, category_name]) => ({ id, category_name }));
+
+  const allSubcategories = Array.from(
+    allProducts.reduce((map, p) => {
+      if (p.subcategory_id != null && !map.has(p.subcategory_id)) {
+        map.set(p.subcategory_id, p.subcategory_name || `Subcategory ${p.subcategory_id}`);
+      }
+      return map;
+    }, new Map<number, string>())
+  ).map(([id, subcategory_name]) => ({ id, subcategory_name }));
 
   const handlePriceChange = (minPrice: number, maxPrice: number) => {
     onFiltersChange({
@@ -286,10 +417,11 @@ function Sidebar({
             onFiltersChange({
               categories: [],
               subcategories: [],
+              genders: [],
               jewelleryTypes: [],
               goldTypes: [],
-              minPrice: 10000,
-              maxPrice: 1000000,
+              minPrice: 0,
+              maxPrice: 0,
               sortBy: "Default"
             });
             // Also clear URL params
@@ -357,31 +489,66 @@ function Sidebar({
         )}
       </div>
 
-      {/* Categories with nested subcategories */}
-      <FilterSection title="Categories">
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {categories.map((cat) => (
-            <div key={cat.id}>
-              <CheckRow 
-                label={cat.category_name} 
+      {/* Categories — derived from actual products */}
+      {productCategories.length > 0 && (
+        <FilterSection title="Categories">
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {productCategories.map((cat) => (
+              <CheckRow
+                key={cat.id}
+                label={cat.category_name}
+                count={countCategory(cat.id)}
                 checked={filters.categories.includes(cat.id)}
                 onClick={() => handleCategoryToggle(cat.id)}
               />
-              {/* Show subcategories when category is selected */}
-              {filters.categories.includes(cat.id) && cat.subcategories && cat.subcategories.length > 0 && (
-                <div style={{ marginLeft: 16, marginTop: 4, paddingLeft: 8, borderLeft: '2px solid #e5e7eb' }}>
-                  {cat.subcategories.map((sub) => (
-                    <div key={sub.id} style={{ marginBottom: 4 }}>
-                      <CheckRow 
-                        label={sub.subcategory_name} 
-                        checked={filters.subcategories.includes(sub.id)}
-                        onClick={() => handleSubcategoryToggle(sub.id)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            ))}
+          </div>
+        </FilterSection>
+      )}
+
+      {/* Gender */}
+      <FilterSection title="Gender">
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {GENDERS.map(g => (
+            <CheckRow
+              key={g}
+              label={g}
+              count={countGender(g)}
+              checked={filters.genders.includes(g)}
+              onClick={() => handleGenderToggle(g)}
+            />
+          ))}
+        </div>
+      </FilterSection>
+
+      {/* Subcategories (flat, across all categories) */}
+      {allSubcategories.length > 0 && (
+        <FilterSection title="subcategories">
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {allSubcategories.map(sub => (
+              <CheckRow
+                key={sub.id}
+                label={sub.subcategory_name}
+                count={countSubcategory(sub.id)}
+                checked={filters.subcategories.includes(sub.id)}
+                onClick={() => handleSubcategoryToggle(sub.id)}
+              />
+            ))}
+          </div>
+        </FilterSection>
+      )}
+
+      {/* Jewellery Type (Material) */}
+      <FilterSection title="Jewellery Type (Material)">
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {JEWELLERY_TYPES.map(t => (
+            <CheckRow
+              key={t}
+              label={t}
+              count={countJewelleryType(t)}
+              checked={filters.jewelleryTypes.includes(t)}
+              onClick={() => handleJewelleryTypeToggle(t)}
+            />
           ))}
         </div>
       </FilterSection>
@@ -389,12 +556,13 @@ function Sidebar({
       {/* Gold Type */}
       <FilterSection title="Gold Type">
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {GOLD_TYPES.map((g) => (
-            <CheckRow 
-              key={g.label} 
-              label={g.label} 
-              checked={filters.goldTypes.includes(g.label)}
-              onClick={() => handleGoldTypeToggle(g.label)}
+          {GOLD_TYPES.map(g => (
+            <CheckRow
+              key={g}
+              label={g}
+              count={countGoldType(g)}
+              checked={filters.goldTypes.includes(g)}
+              onClick={() => handleGoldTypeToggle(g)}
             />
           ))}
         </div>
@@ -406,20 +574,90 @@ function Sidebar({
 /* ════════════════════════
    PRODUCT CARD
 ════════════════════════ */
+const COLOR_SWATCHES: { key: string; label: string; hex: string; ring: string; match: (c: string) => boolean }[] = [
+  { key: "rose", label: "Rose Gold", hex: "#E8B4B4", ring: "#f5d5d5", match: c => c.includes("rose") || c.includes("pink") },
+  { key: "white", label: "White Gold", hex: "#D9D9D9", ring: "#ececec", match: c => c.includes("white") },
+  { key: "yellow", label: "Yellow Gold", hex: "#E4AC14", ring: "#f4dc8f", match: c => c.includes("yellow") },
+];
+
 function ProductCard({ product }: { product: Product }) {
+  const navigate = useNavigate();
+  const { format } = useCurrency(); // converts INR → active currency (INR/USD)
   const [hovered, setHovered] = useState(false);
-  
-  // Generate a gradient background based on product ID
-  const gradients = [
-    "linear-gradient(135deg,#f8f4f0,#ede8e2)",
-    "linear-gradient(135deg,#f0f0f4,#e4e4ec)",
-    "linear-gradient(135deg,#faf0f0,#f0e4e4)",
-    "linear-gradient(135deg,#f4f4f0,#eaeae0)",
-    "linear-gradient(135deg,#fdf8ee,#f5edd6)",
-    "linear-gradient(135deg,#f0f4f0,#e4eae4)",
-  ];
-  const bg = gradients[product.id % gradients.length];
-  
+  const [inWishlist, setInWishlist] = useState(false);
+  const [busy, setBusy] = useState<false | 'cart' | 'wishlist'>(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const materialColor = (product.material_color || "").toLowerCase();
+  const availableSwatches = COLOR_SWATCHES.filter(s => s.match(materialColor));
+  const mrp = product.price ? Math.round(product.price * 1.12) : 0; // display MRP ≈ 12% above sale
+
+  const hoverImage = product.product_image_hover && product.product_image_hover !== product.product_image
+    ? product.product_image_hover
+    : null;
+
+  useEffect(() => {
+    if (!authService.isAuthenticated()) return;
+    let cancelled = false;
+    const sync = async () => {
+      const map = await getWishlistProductMap();
+      if (!cancelled) setInWishlist(map.has(product.id));
+    };
+    sync();
+    const refresh = () => sync();
+    window.addEventListener(WISHLIST_UPDATE_EVENT, refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(WISHLIST_UPDATE_EVENT, refresh);
+    };
+  }, [product.id]);
+
+  const flashToast = (text: string) => {
+    setToast(text);
+    setTimeout(() => setToast(null), 1800);
+  };
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    const user = authService.getCurrentUser();
+    if (!user?.id) {
+      navigate('/login');
+      return;
+    }
+    setBusy('cart');
+    const res = await apiService.addToCart(user.id, product.id, 1, 0, user.role);
+    if (res.success) {
+      dispatchCartUpdate();
+      flashToast('Added to cart');
+    } else if (res.alreadyExists) {
+      flashToast('Already in cart');
+    } else {
+      flashToast(res.message || 'Could not add');
+    }
+    setBusy(false);
+  };
+
+  const handleToggleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    if (!authService.isAuthenticated()) {
+      navigate('/login');
+      return;
+    }
+    setBusy('wishlist');
+    const previous = inWishlist;
+    setInWishlist(!previous);
+    const res = await toggleWishlistWithUpdate(product.id);
+    if (!res.success) {
+      setInWishlist(previous);
+      flashToast('Failed to update wishlist');
+    }
+    setBusy(false);
+  };
+
   return (
     <Link
       to={`/product/${product.id}`}
@@ -427,67 +665,182 @@ function ProductCard({ product }: { product: Product }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: "#fff",
-        borderRadius: 12,
-        border: "1px solid #f0f0f0",
+        borderRadius: 14,
+        border: "none",
         overflow: "hidden",
         cursor: "pointer",
         boxShadow: hovered ? "0 6px 24px rgba(0,0,0,0.10)" : "0 1px 6px rgba(0,0,0,0.06)",
         transition: "box-shadow 0.2s, transform 0.2s",
         transform: hovered ? "translateY(-2px)" : "translateY(0)",
         fontFamily: SF,
-        display: "block",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
         textDecoration: "none",
       }}
     >
-      {/* Image area */}
-      <div style={{
-        aspectRatio: "1/1",
-        background: bg,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 72,
-        overflow: "hidden",
-      }}>
-        <img 
-          src={product.product_image} 
-          alt={product.product_name} 
-          style={{ 
-            width: "100%", 
-            height: "100%", 
-            objectFit: "cover", 
-            transform: hovered ? "scale(1.06)" : "scale(1)", 
-            transition: "transform 0.25s" 
-          }} 
-        />
+      {/* Image area — full-bleed: image fills the tile with its own backdrop */}
+      <div style={{ padding: 10 }}>
+        <div style={{
+          position: "relative",
+          aspectRatio: "1/1",
+          backgroundColor: "#eef0f3",
+          borderRadius: 12,
+          overflow: "hidden",
+          boxSizing: "border-box",
+        }}>
+          {/* Primary image — covers the tile edge-to-edge */}
+          <img
+            src={product.product_image}
+            alt={product.product_name}
+            loading="lazy"
+            decoding="async"
+            style={{
+              position: "absolute", inset: 0,
+              width: "100%", height: "100%",
+              objectFit: "cover",
+              transform: hovered && !hoverImage ? "scale(1.05)" : "scale(1)",
+              transition: "transform 0.35s ease",
+            }}
+          />
+          {/* Hover (lifestyle) image — slides in from the right to cover the studio shot */}
+          {hoverImage && (
+            <img
+              src={hoverImage}
+              alt={product.product_name}
+              loading="lazy"
+              decoding="async"
+              style={{
+                position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                objectFit: "cover",
+                transform: hovered ? "translateX(0)" : "translateX(100%)",
+                transition: "transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
+                willChange: "transform",
+                zIndex: 1,
+              }}
+            />
+          )}
+
+          {/* Action overlay — cart + heart, fades in on hover */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0, right: 0, bottom: 12,
+              display: "flex", gap: 10,
+              alignItems: "center", justifyContent: "center",
+              opacity: hovered ? 1 : 0,
+              transform: hovered ? "translateY(0)" : "translateY(6px)",
+              pointerEvents: hovered ? "auto" : "none",
+              transition: "opacity 0.2s, transform 0.2s",
+              zIndex: 2,
+            }}
+          >
+            <button
+              onClick={handleAddToCart}
+              aria-label="Add to cart"
+              disabled={busy === 'cart'}
+              style={{
+                width: 40, height: 40, borderRadius: "50%",
+                background: "#fff",
+                border: "1px solid rgba(0,0,0,0.08)",
+                boxShadow: "0 3px 10px rgba(0,0,0,0.12)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: busy === 'cart' ? 'wait' : 'pointer',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <path d="M16 10a4 4 0 0 1-8 0" />
+              </svg>
+            </button>
+            <button
+              onClick={handleToggleWishlist}
+              aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+              disabled={busy === 'wishlist'}
+              style={{
+                width: 40, height: 40, borderRadius: "50%",
+                background: "#fff",
+                border: "1px solid rgba(0,0,0,0.08)",
+                boxShadow: "0 3px 10px rgba(0,0,0,0.12)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: busy === 'wishlist' ? 'wait' : 'pointer',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#ef4444" : "none"} stroke={inWishlist ? "#ef4444" : "#111827"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+              </svg>
+            </button>
+          </div>
+
+          {toast && (
+            <div style={{
+              position: "absolute", top: 10, left: 10, right: 10,
+              textAlign: "center",
+              background: "rgba(17,24,39,0.88)",
+              color: "#fff",
+              fontSize: 12, fontWeight: 600,
+              padding: "6px 10px",
+              borderRadius: 6,
+              zIndex: 3,
+            }}>
+              {toast}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Info */}
-      <div style={{ padding: "12px 14px 14px" }}>
+      <div style={{
+        padding: "6px 16px 16px",
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+      }}>
         <p style={{
-          fontSize: 13, fontWeight: 600, color: "#111827",
-          margin: "0 0 6px", lineHeight: 1.4,
+          fontSize: 15, fontWeight: 700, color: "#111827",
+          margin: "0 0 10px", lineHeight: 1.35,
+          textAlign: "left",
           display: "-webkit-box", WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical", overflow: "hidden",
         }}>
           {product.product_name}
         </p>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
-            ₹{product.price?.toLocaleString('en-IN') || '0'}
+
+        {/* Price row — sale + MRP strikethrough, anchored to bottom of card */}
+        {/* Prices come from the API in INR. format() converts + formats per currency. */}
+        {/* inputIncludesGst: INR backend prices bake in 3% GST; for USD we strip that. */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12, marginTop: "auto" }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>
+            {format(product.price || 0, { inputIncludesGst: true })}
           </span>
-        </div>
-        {/* Material Color */}
-        {product.material_color && (
-          <div style={{ marginBottom: 6 }}>
-            <span style={{
-              fontSize: 11,
-              color: "#6b7280",
-              background: "#f3f4f6",
-              padding: "2px 6px",
-              borderRadius: 4,
-              textTransform: "capitalize"
-            }}>
-              {product.material_color}
+          {mrp > 0 && (
+            <span style={{ fontSize: 13, color: "#9ca3af", textDecoration: "line-through" }}>
+              {format(mrp, { inputIncludesGst: true })}
             </span>
+          )}
+        </div>
+
+        {/* Color swatches — matches ProductDetail style */}
+        {availableSwatches.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
+            {availableSwatches.map(s => (
+              <span
+                key={s.key}
+                title={s.label}
+                aria-label={s.label}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: s.hex,
+                  border: "2px solid #fff",
+                  boxShadow: "0 0 0 2px rgba(0,0,0,0.12)",
+                  display: "inline-block",
+                }}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -498,6 +851,8 @@ function ProductCard({ product }: { product: Product }) {
 /* ════════════════════════
    MAIN PAGE
 ════════════════════════ */
+const PAGE_SIZE = 20; // How many products to render per "page"; user clicks "Load More" for the next batch
+
 export default function ProductList() {
   const [products, setProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -505,6 +860,7 @@ export default function ProductList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [searchParams] = useSearchParams();
   const categoryParam = searchParams.get('category') || '';
@@ -513,10 +869,11 @@ export default function ProductList() {
   const [filters, setFilters] = useState<FilterState>({
     categories: [],
     subcategories: [],
+    genders: [],
     jewelleryTypes: [],
     goldTypes: [],
-    minPrice: 10000,
-    maxPrice: 1000000,
+    minPrice: 0,
+    maxPrice: 0,
     sortBy: "Default"
   });
 
@@ -557,6 +914,21 @@ export default function ProductList() {
     fetchData();
   }, [categoryParam]);
 
+  // Once products load, align min/max price filters to the catalog's actual range
+  // (only if the user hasn't touched them yet — detected by checking they're still at the initial 0)
+  useEffect(() => {
+    if (allProducts.length === 0) return;
+    const priced = allProducts.filter(p => (p.price || 0) > 0);
+    if (priced.length === 0) return;
+    const catalogMin = Math.floor(Math.min(...priced.map(p => p.price)));
+    const catalogMax = Math.ceil(Math.max(...priced.map(p => p.price), catalogMin + 100000));
+    setFilters(prev => ({
+      ...prev,
+      minPrice: prev.minPrice === 0 ? catalogMin : prev.minPrice,
+      maxPrice: prev.maxPrice === 0 ? catalogMax : prev.maxPrice,
+    }));
+  }, [allProducts]);
+
   // Apply filters whenever filters change
   useEffect(() => {
     const applyFilters = async () => {
@@ -573,32 +945,35 @@ export default function ProductList() {
         filtered = filtered.filter(p => filters.categories.includes(p.category_id));
       }
       
-      // Apply subcategory filter
+      // Apply subcategory filter (allow subcategory_id of 0)
       if (filters.subcategories.length > 0) {
-        filtered = filtered.filter(p => p.subcategory_id && filters.subcategories.includes(p.subcategory_id));
+        filtered = filtered.filter(p => p.subcategory_id != null && filters.subcategories.includes(p.subcategory_id));
       }
 
-      // Apply gold type (color) filter - need to fetch product details for material_color
+      // Apply gender filter
+      if (filters.genders.length > 0) {
+        filtered = filtered.filter(p => filters.genders.some(sel => matchGender(p.gender || "", sel)));
+      }
+
+      // Apply jewellery type filter (inclusive: "Gold" matches any gold product, even with diamonds)
+      if (filters.jewelleryTypes.length > 0) {
+        filtered = filtered.filter(p => {
+          const metal = (p.metal_name || "").toLowerCase();
+          const hasDiamond = Number(p.has_diamond) === 1;
+          return filters.jewelleryTypes.some(t => {
+            if (t === "Gold") return metal.includes("gold");
+            if (t === "Diamonds") return hasDiamond;
+            if (t === "Gold & Diamonds") return metal.includes("gold") && hasDiamond;
+            return false;
+          });
+        });
+      }
+
+      // Apply gold type (color) filter — material_color now arrives with /getproducts
       if (filters.goldTypes.length > 0) {
-        const productsWithDetails = await Promise.all(
-          filtered.map(async (p) => {
-            try {
-              // Only fetch details if we don't already have material_color
-              if (!p.material_color) {
-                const details = await apiService.getProductDetails(p.id);
-                return { ...p, material_color: details.material_color };
-              }
-              return p;
-            } catch (error) {
-              console.warn(`Failed to get details for product ${p.id}:`, error);
-              return p; // Return product without material_color if API fails
-            }
-          })
-        );
-        
-        filtered = productsWithDetails.filter(p => {
-          if (!p.material_color) return false;
-          const pColor = p.material_color.toLowerCase();
+        filtered = filtered.filter(p => {
+          const pColor = (p.material_color || "").toLowerCase();
+          if (!pColor) return false;
           return filters.goldTypes.some(g => {
             if (g === "Yellow Gold") return pColor.includes("yellow");
             if (g === "Rose Gold") return pColor.includes("pink") || pColor.includes("rose");
@@ -608,8 +983,12 @@ export default function ProductList() {
         });
       }
       
-      // Apply price range filter
-      filtered = filtered.filter(p => p.price >= filters.minPrice && p.price <= filters.maxPrice);
+      // Apply price range filter — 0 on either bound means "not set yet (initial state)"
+      filtered = filtered.filter(p => {
+        if (filters.minPrice > 0 && p.price < filters.minPrice) return false;
+        if (filters.maxPrice > 0 && p.price > filters.maxPrice) return false;
+        return true;
+      });
       
       // Apply sorting
       switch (filters.sortBy) {
@@ -634,6 +1013,7 @@ export default function ProductList() {
       }
       
       setProducts(filtered);
+      setVisibleCount(PAGE_SIZE); // Reset to first page whenever filters change
     };
 
     applyFilters();
@@ -657,14 +1037,14 @@ export default function ProductList() {
       return "Multiple Categories";
     }
     
-    return "All Products";
+    return "Sustainable Lab Created Diamond Rings";
   };
 
   const getPageDescription = () => {
     if (searchQuery) {
       return `Found ${products.length} products matching your search.`;
     }
-    return `Discover our collection of ${products.length} beautiful jewellery pieces.`;
+    return `Discover beautifully crafted lab-created diamond rings designed for modern elegance. Each piece offers exceptional brilliance, ethical sourcing, and timeless style perfect for engagements, weddings, and special moments.`;
   };
 
   if (loading) {
@@ -756,7 +1136,7 @@ export default function ProductList() {
         padding: "40px 32px 60px",
         fontFamily: SF,
       }} className="page-padding">
-        <div style={{ maxWidth: 1140, margin: "0 auto" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
 
           {/* Page heading */}
           <div style={{ textAlign: "center", marginBottom: 36 }}>
@@ -768,7 +1148,7 @@ export default function ProductList() {
             </h1>
             <p style={{
               fontFamily: SF, fontSize: 14, color: "#6b7280",
-              maxWidth: 680, margin: "0 auto", lineHeight: 1.65,
+              maxWidth: 900, margin: "0 auto", lineHeight: 1.65,
             }}>
               {getPageDescription()}
             </p>
@@ -802,8 +1182,8 @@ export default function ProductList() {
           {/* Layout: sidebar + grid */}
           <div style={{ display: "flex", gap: 36, alignItems: "flex-start" }} className="product-layout">
             <div className="sidebar-desktop" style={{ display: 'block' }}>
-              <Sidebar 
-                categories={categories}
+              <Sidebar
+                allProducts={allProducts}
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
               />
@@ -850,8 +1230,8 @@ export default function ProductList() {
                       </svg>
                     </button>
                   </div>
-                  <Sidebar 
-                    categories={categories}
+                  <Sidebar
+                    allProducts={allProducts}
                     filters={filters}
                     onFiltersChange={handleFiltersChange}
                   />
@@ -880,15 +1260,47 @@ export default function ProductList() {
             {/* Product grid */}
             <main style={{ flex: 1, minWidth: 0 }}>
               {products.length > 0 ? (
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 18,
-                }} className="product-grid">
-                  {products.map(p => (
-                    <ProductCard key={p.id} product={p} />
-                  ))}
-                </div>
+                <>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, 1fr)",
+                    gap: 18,
+                  }} className="product-grid">
+                    {products.slice(0, visibleCount).map(p => (
+                      <ProductCard key={p.id} product={p} />
+                    ))}
+                  </div>
+
+                  {visibleCount < products.length && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+                      <button
+                        onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                        style={{
+                          padding: '12px 28px',
+                          background: '#fff',
+                          color: '#111827',
+                          border: `1.5px solid ${GOLD}`,
+                          borderRadius: 10,
+                          fontSize: 14,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: SF,
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = GOLD;
+                          e.currentTarget.style.color = '#fff';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = '#fff';
+                          e.currentTarget.style.color = '#111827';
+                        }}
+                      >
+                        Load More ({products.length - visibleCount} remaining)
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div style={{ textAlign: 'center', padding: '60px 0', background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb' }}>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
@@ -899,10 +1311,11 @@ export default function ProductList() {
                       setFilters({
                         categories: [],
                         subcategories: [],
+                        genders: [],
                         jewelleryTypes: [],
                         goldTypes: [],
-                        minPrice: 10000,
-                        maxPrice: 1000000,
+                        minPrice: 0,
+                        maxPrice: 0,
                         sortBy: "Default"
                       });
                       const url = new URL(window.location.href);

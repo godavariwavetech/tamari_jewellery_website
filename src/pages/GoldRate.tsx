@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiService } from "../services/api";
+import { useCurrency } from "../context/CurrencyContext";
 
 interface MetalRate {
   metal_name: string;
@@ -10,6 +11,7 @@ interface MetalRate {
 }
 
 const GoldRate = () => {
+  const { format } = useCurrency();
   const [metalRates, setMetalRates] = useState<MetalRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +127,7 @@ const GoldRate = () => {
                       <span className="font-semibold text-gray-800">{item.metal_name}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-lg font-bold text-yellow-600">₹{item.rate_per_gram.toLocaleString('en-IN')}</span>
+                      <span className="text-lg font-bold text-yellow-600">{format(item.rate_per_gram)}</span>
                     </td>
                     <td className="px-6 py-4 text-gray-600 text-sm">per gram</td>
                     <td className="px-6 py-4">
@@ -181,7 +183,7 @@ const GoldRate = () => {
                       <span className="font-semibold text-gray-800">{item.metal_name}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-lg font-bold text-gray-600">₹{item.rate_per_gram.toLocaleString('en-IN')}</span>
+                      <span className="text-lg font-bold text-gray-600">{format(item.rate_per_gram)}</span>
                     </td>
                     <td className="px-6 py-4 text-gray-600 text-sm">per gram</td>
                     <td className="px-6 py-4">

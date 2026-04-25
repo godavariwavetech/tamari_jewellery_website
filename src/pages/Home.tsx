@@ -3,6 +3,13 @@ import { useNavigate } from "react-router-dom";
 import HeroBanner from "../components/HeroBanner";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { apiService, type Category, type Product, type BannerVideo } from "../services/api";
+import { authService } from "../services/auth";
+import { useCurrency } from "../context/CurrencyContext";
+import {
+  WISHLIST_UPDATE_EVENT,
+  getWishlistProductMap,
+  toggleWishlistWithUpdate,
+} from "../utils/cartUtils";
 
 import bangle from "../assets/product-image.png";
 import trending1 from "../assets/trending1.png";
@@ -29,11 +36,15 @@ function useWidth() {
 }
 
 /* ── Icons ── */
-const HeartIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-  </svg>
-);
+const HeartIcon = ({ filled = false, dark = false }: { filled?: boolean; dark?: boolean }) => {
+  const stroke = filled ? "#ef4444" : (dark ? "#fff" : "#555");
+  const fill = filled ? "#ef4444" : "none";
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+    </svg>
+  );
+};
 const ChevL = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
 );
@@ -124,7 +135,7 @@ function ShopByCategory({ w }: { w: number }) {
   
   const columns = isDesktop ? 5 : isTablet ? 3 : 2;
   const gap = isDesktop ? 24 : isTablet ? 18 : 12;
-  const paddingX = isDesktop ? 56 : isTablet ? 40 : 16;
+  const sectionPadX = isDesktop ? 48 : isTablet ? 32 : 16;
 
   if (loading) {
     return (
@@ -149,18 +160,25 @@ function ShopByCategory({ w }: { w: number }) {
   }
 
   return (
-    <section style={{ 
-      background: "#fff", 
-      padding: `${isDesktop ? 50 : isTablet ? 40 : 36}px ${isMobile ? 16 : 0}px`,
+    <section style={{
+      background: "#fff",
+      padding: `${isDesktop ? 50 : isTablet ? 40 : 36}px 0`,
       width: "100%",
     }}>
       <Heading title="Shop by Category" ornament />
-      <div style={{ position: "relative", width: "100%" }}>
+      <div style={{
+        position: "relative",
+        width: "100%",
+        maxWidth: 1400,
+        margin: "0 auto",
+        paddingLeft: sectionPadX,
+        paddingRight: sectionPadX,
+      }}>
         {!isMobile && categories.length > columns && (
           <NavBtn side="left" onClick={() => handleScroll('left')}><ChevL /></NavBtn>
         )}
-        
-        <div 
+
+        <div
           ref={scrollRef}
           style={{
             display: isMobile ? "grid" : "flex",
@@ -169,9 +187,7 @@ function ShopByCategory({ w }: { w: number }) {
             overflowX: isMobile ? "visible" : "auto",
             scrollbarWidth: "none",
             gap: gap,
-            padding: isMobile ? `4px 0 24px` : `4px ${paddingX}px 10px`,
-            maxWidth: 1400,
-            margin: "0 auto",
+            padding: isMobile ? `4px 0 24px` : `4px 0 10px`,
             WebkitOverflowScrolling: "touch",
           }}
           className="hide-scrollbar"
@@ -246,17 +262,62 @@ function NavBtn({ side, children, onClick }: { side: 'left' | 'right'; children:
    3. TRENDING STYLES
 ════════════════════════════════════════ */
 function TrendingStyles({ w }: { w: number }) {
+  const navigate = useNavigate();
+  const { format } = useCurrency(); // INR → active currency
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [wishlistIds, setWishlistIds] = useState<Set<number>>(new Set());
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const container = scrollRef.current;
+      const scrollAmount = container.clientWidth * 0.8;
+      container.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  useEffect(() => {
+    const refreshWishlist = async () => {
+      const map = await getWishlistProductMap();
+      setWishlistIds(new Set(map.keys()));
+    };
+    refreshWishlist();
+    window.addEventListener(WISHLIST_UPDATE_EVENT, refreshWishlist);
+    return () => window.removeEventListener(WISHLIST_UPDATE_EVENT, refreshWishlist);
+  }, []);
+
+  const handleWishlistToggle = async (productId: number) => {
+    if (!authService.isAuthenticated()) {
+      navigate('/login');
+      return;
+    }
+    setTogglingId(productId);
+    setWishlistIds(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+    const res = await toggleWishlistWithUpdate(productId);
+    if (!res.success) {
+      const map = await getWishlistProductMap();
+      setWishlistIds(new Set(map.keys()));
+    }
+    setTogglingId(null);
+  };
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        // Get user_id from localStorage if available
-        const userId = localStorage.getItem('user_id');
-        const data = await apiService.getTopProducts(10, userId ? parseInt(userId) : undefined);
+        const currentUser = authService.getCurrentUser();
+        const data = await apiService.getTopProducts(10, currentUser?.id);
         setProducts(data);
       } catch (err) {
         setError('Failed to load products');
@@ -272,7 +333,9 @@ function TrendingStyles({ w }: { w: number }) {
   const isTablet = w >= 768 && w < 1200;
   const isDesktop = w >= 1200;
   const isMobile = w < 768;
-  const cols = isDesktop ? 4 : isTablet ? 3 : 2;
+  const cardsVisible = isDesktop ? 4 : isTablet ? 3 : 2;
+  const cardWidth = isDesktop ? 280 : isTablet ? 240 : 200;
+  const gap = isDesktop ? 24 : isTablet ? 20 : 12;
 
   if (loading) {
     return (
@@ -297,18 +360,63 @@ function TrendingStyles({ w }: { w: number }) {
   }
 
   return (
-    <section style={{ background: "linear-gradient(180deg,#faf5e8,#f5edd8)", padding: `${isDesktop ? 60 : isTablet ? 50 : 40}px ${isDesktop ? 48 : isTablet ? 32 : 12}px` }}>
+    <section style={{ background: "linear-gradient(180deg,#faf5e8,#f5edd8)", padding: `${isDesktop ? 60 : isTablet ? 50 : 40}px 0` }}>
       <Heading title="Trending Styles" ornament />
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${cols}, 1fr)`,
-        gap: isDesktop ? 24 : isTablet ? 20 : 12,
-        maxWidth: 1400,
-        margin: "0 auto",
-      }}>
-        {products.slice(0, cols * 2).map((p) => (
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: 1400,
+          margin: "0 auto",
+          paddingLeft: isDesktop ? 48 : isTablet ? 32 : 16,
+          paddingRight: isDesktop ? 48 : isTablet ? 32 : 16,
+        }}
+      >
+        {products.length > cardsVisible && (
+          <button
+            onClick={() => handleScroll('left')}
+            aria-label="Scroll left"
+            style={{
+              position: "absolute",
+              left: isDesktop ? 4 : isTablet ? 4 : 6,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: isMobile ? 36 : 40,
+              height: isMobile ? 36 : 40,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.95)",
+              border: "1.5px solid #e5d9b8",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 2,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+            }}
+          >
+            <ChevL />
+          </button>
+        )}
+
+        <div
+          ref={scrollRef}
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            gap: gap,
+            padding: "4px 0 10px",
+            WebkitOverflowScrolling: "touch",
+            scrollSnapType: "x mandatory",
+          }}
+          className="hide-scrollbar"
+        >
+        {products.map((p) => (
           <div key={p.id} style={{
-            width: "100%",
+            width: cardWidth,
+            flexShrink: 0,
+            scrollSnapAlign: 'start',
             background: "#fff",
             borderRadius: 16,
             boxShadow: "0 2px 18px rgba(0,0,0,0.07)",
@@ -318,32 +426,45 @@ function TrendingStyles({ w }: { w: number }) {
             onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,0.13)"; }}
             onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 18px rgba(0,0,0,0.07)"; }}
           >
-            {/* Image area */}
+            {/* Image area — padded inner tile with all-round corners */}
             <div style={{
               position: "relative",
-              height: isDesktop ? 300 : isTablet ? 240 : 180,
+              padding: isDesktop ? 12 : isTablet ? 10 : 8,
             }}>
               <div style={{
                 width: "100%",
-                height: "100%",
+                height: isDesktop ? 200 : isTablet ? 220 : 170,
                 backgroundImage: `url(${p.product_image || trending1})`,
-                backgroundSize: "cover",
+                backgroundSize: "contain",
+                backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
-                borderRadius: "14px 14px 0 0",
+                backgroundColor: "#f5eedd",
+                backgroundBlendMode: "multiply",
+                borderRadius: 14,
+                border: "1px solid rgba(228,172,20,0.12)",
               }} />
 
-              {/* Wishlist heart — top right */}
-              <button style={{
-                position: "absolute", top: 10, right: 10,
-                width: isMobile ? 30 : 34, height: isMobile ? 30 : 34, borderRadius: "50%",
-                background: "rgba(255,255,255,0.75)",
-                border: "none",
-                backdropFilter: "blur(4px)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer",
-                boxShadow: "0 1px 6px rgba(0,0,0,0.10)",
-              }}>
-                <HeartIcon />
+              {/* Wishlist heart — top right, inside the inner tile */}
+              <button
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleWishlistToggle(p.id); }}
+                disabled={togglingId === p.id}
+                aria-label={wishlistIds.has(p.id) ? "Remove from wishlist" : "Add to wishlist"}
+                style={{
+                  position: "absolute",
+                  top: isDesktop ? 22 : isTablet ? 20 : 16,
+                  right: isDesktop ? 22 : isTablet ? 20 : 16,
+                  width: isMobile ? 30 : 34,
+                  height: isMobile ? 30 : 34,
+                  borderRadius: "50%",
+                  background: "rgba(0,0,0,0.35)",
+                  border: "none",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: togglingId === p.id ? "wait" : "pointer",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+                }}>
+                <HeartIcon filled={wishlistIds.has(p.id)} dark />
               </button>
             </div>
 
@@ -369,16 +490,36 @@ function TrendingStyles({ w }: { w: number }) {
               }}>{p.product_name}</p>
 
               {/* Price row */}
+              <div style={{display:"flex", flexDirection:"row", gap:"10px"}}>
+                
+              {/* Prices are stored in INR; format() converts to active currency (INR/USD) */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
                 <span style={{
                   fontFamily: SF,
                   fontSize: isDesktop ? 15 : isTablet ? 14 : 13,
                   fontWeight: 700,
                   color: "#1a1a1a",
-                }}>₹{(p.price || p.total_price || 0).toLocaleString('en-IN')}</span>
+                }}>{format(p.price || p.total_price || 60000, { inputIncludesGst: true })}</span>
               </div>
-
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                <span style={{
+                  fontFamily: SF,
+                  textDecoration: "line-through",
+                  fontSize: isDesktop ? 13 : isTablet ? 14 : 13,
+                  fontWeight: 500,
+                  color: "#666666",
+                }}>{format(p.price || p.total_price || 80000, { inputIncludesGst: true })}</span>
+              </div>
+              </div>
               
+               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                <span style={{
+                  fontFamily: SF,
+                  fontSize: isDesktop ? 12 : isTablet ? 14 : 13,
+                  fontWeight: 500,
+                  color: "#666666",
+                }}>20% off on making charges</span>
+              </div>
 
               {/* ✅ Round gold + button — bottom right */}
               <button style={{
@@ -416,6 +557,33 @@ function TrendingStyles({ w }: { w: number }) {
             </div>
           </div>
         ))}
+        </div>
+
+        {products.length > cardsVisible && (
+          <button
+            onClick={() => handleScroll('right')}
+            aria-label="Scroll right"
+            style={{
+              position: "absolute",
+              right: isDesktop ? 4 : isTablet ? 4 : 6,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: isMobile ? 36 : 40,
+              height: isMobile ? 36 : 40,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.95)",
+              border: "1.5px solid #e5d9b8",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 2,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+            }}
+          >
+            <ChevR />
+          </button>
+        )}
       </div>
     </section>
   );
@@ -596,6 +764,39 @@ function MediaPresence({ w }: { w: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch titles from YouTube oEmbed for any video that didn't come with one
+  useEffect(() => {
+    const missing = videos.filter(v => !v.video_title && v.video_url);
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async v => {
+          try {
+            const res = await fetch(
+              `https://www.youtube.com/oembed?url=${encodeURIComponent(v.video_url)}&format=json`
+            );
+            if (!res.ok) return [v.id, null] as const;
+            const json = await res.json();
+            return [v.id, json.title as string] as const;
+          } catch {
+            return [v.id, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setVideos(prev =>
+        prev.map(v => {
+          const match = entries.find(([id]) => id === v.id);
+          if (match && match[1]) return { ...v, video_title: match[1] };
+          return v;
+        })
+      );
+    })();
+    return () => { cancelled = true; };
+  }, [videos]);
+
   useEffect(() => {
     const fetchVideos = async () => {
       try {
@@ -735,7 +936,26 @@ function MediaPresence({ w }: { w: number }) {
                   </div>
                 </div>
               </div>
-              
+
+              {m.video_title && (
+                <p
+                  style={{
+                    fontFamily: SF,
+                    fontSize: isDesktop ? 14 : 13,
+                    fontWeight: 600,
+                    color: "#1a1a1a",
+                    margin: "4px 4px 0",
+                    lineHeight: 1.4,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {m.video_title}
+                </p>
+              )}
             </a>
           );
         })}
@@ -905,7 +1125,14 @@ function Testimonials({ w }: { w: number }) {
         }}
       />
 
-      <div style={{ position: "relative", zIndex: 1 }}>
+      <div style={{
+        position: "relative",
+        zIndex: 1,
+        maxWidth: 1400,
+        margin: "0 auto",
+        paddingLeft: isDesktop ? 48 : isTablet ? 32 : 16,
+        paddingRight: isDesktop ? 48 : isTablet ? 32 : 16,
+      }}>
         <Heading title="Testimonials" ornament />
 
         <div style={{ position: 'relative' }}>
@@ -916,7 +1143,7 @@ function Testimonials({ w }: { w: number }) {
               gap: isDesktop ? 24 : isTablet ? 20 : 16,
               overflowX: "auto",
               scrollbarWidth: "none",
-              padding: isDesktop ? "24px 40px" : isTablet ? "24px 28px" : "24px 16px",
+              padding: "24px 0",
               marginTop: 24,
             }}
           >
@@ -925,19 +1152,20 @@ function Testimonials({ w }: { w: number }) {
             ))}
           </div>
 
-          {/* Navigation Arrows */}
-          <button 
+          {/* Navigation Arrows — vertically centered on cards, horizontally outside them */}
+          <button
             onClick={() => handleScroll('left')}
+            aria-label="Scroll left"
             style={{
               position: 'absolute',
-              left: isDesktop ? 10 : 5,
+              left: isDesktop ? -42 : isTablet ? -26 : -10,
               top: '50%',
               transform: 'translateY(-50%)',
-              background: 'rgba(255,255,255,0.9)',
+              background: 'rgba(255,255,255,0.95)',
               border: '1px solid #ddd',
               borderRadius: '50%',
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -948,18 +1176,19 @@ function Testimonials({ w }: { w: number }) {
           >
             <ChevL />
           </button>
-          <button 
+          <button
             onClick={() => handleScroll('right')}
+            aria-label="Scroll right"
             style={{
               position: 'absolute',
-              right: isDesktop ? 10 : 5,
+              right: isDesktop ? -42 : isTablet ? -26 : -10,
               top: '50%',
               transform: 'translateY(-50%)',
-              background: 'rgba(255,255,255,0.9)',
+              background: 'rgba(255,255,255,0.95)',
               border: '1px solid #ddd',
               borderRadius: '50%',
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',

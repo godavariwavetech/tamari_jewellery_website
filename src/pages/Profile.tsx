@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiService, type UserProfile, type Order } from "../services/api";
+import { authService } from "../services/auth";
+import { useCurrency } from "../context/CurrencyContext";
+import ConfirmPopup from "../components/ConfirmPopup";
 
 const SF = "-apple-system, 'SF Pro Display', 'SF Pro Text', BlinkMacSystemFont, sans-serif";
 
@@ -77,7 +81,7 @@ const NAV = [
   { key: "notifications", label: "Notifications",      Icon: BellIcon },
 ];
 
-function Sidebar({ active, setActive, isMobile }: { active: string; setActive: (key: string) => void; isMobile?: boolean }) {
+function Sidebar({ active, setActive, isMobile, onLogoutClick }: { active: string; setActive: (key: string) => void; isMobile?: boolean; onLogoutClick: () => void }) {
   return (
     <div style={{
       background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb",
@@ -111,12 +115,15 @@ function Sidebar({ active, setActive, isMobile }: { active: string; setActive: (
       </ul>
       {!isMobile && (
         <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 14, marginTop: 14 }}>
-          <button style={{
-            width: "100%", display: "flex", alignItems: "center", gap: 10,
-            padding: "10px 14px", borderRadius: 8, cursor: "pointer",
-            background: "transparent", border: "none",
-            color: RED, fontSize: 14, fontWeight: 500, textAlign: "left",
-          }}>
+          <button
+            onClick={onLogoutClick}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 14px", borderRadius: 8, cursor: "pointer",
+              background: "transparent", border: "none",
+              color: RED, fontSize: 14, fontWeight: 500, textAlign: "left",
+            }}
+          >
             <LogoutIcon size={16} color={RED} />
             Logout
           </button>
@@ -211,6 +218,7 @@ const statusStyle = (s: string) => {
 };
 
 function OrdersTab({ isMobile, orders }: { isMobile: boolean; orders: Order[] }) {
+  const { format } = useCurrency();
   const [search, setSearch] = useState("");
   const filtered = orders.filter(o =>
     o.order_id?.toLowerCase().includes(search.toLowerCase()) ||
@@ -275,7 +283,7 @@ function OrdersTab({ isMobile, orders }: { isMobile: boolean; orders: Order[] })
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#111827", margin: "0 0 4px" }}>{o.items?.[0]?.product_name || 'Multiple Items'}</p>
                     <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Items: {o.items?.length || 0}</p>
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>₹{o.total_amount?.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{format(o.total_amount || 0, { inputIncludesGst: true })}</div>
                   <div>
                     <span style={{
                       ...statusStyle(o.order_status),
@@ -311,7 +319,7 @@ function OrdersTab({ isMobile, orders }: { isMobile: boolean; orders: Order[] })
                   <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Items: {o.items?.length || 0}</p>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: GOLD, margin: 0 }}>₹{o.total_amount?.toLocaleString('en-IN')}</p>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: GOLD, margin: 0 }}>{format(o.total_amount || 0, { inputIncludesGst: true })}</p>
                       <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>{o.order_date}</p>
                     </div>
                     <button style={{ background: GOLD_L, border: `1px solid ${GOLD_B}`, padding: "8px", borderRadius: 8 }}>
@@ -503,10 +511,12 @@ function NotificationsTab({ isMobile }: { isMobile: boolean }) {
    ROOT
 ════════════════════════════════════ */
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const [active, setActive] = useState("profile");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   useEffect(() => {
@@ -517,33 +527,41 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser?.id) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
       try {
-        const userIdStr = localStorage.getItem('userId');
-        if (!userIdStr) {
-          // Redirect to login if no userId
-          window.location.href = '/login';
-          return;
-        }
-        
-        const userId = parseInt(userIdStr);
         setLoading(true);
-        
         const [profileData, ordersData] = await Promise.all([
-          apiService.getUserProfile(userId),
-          apiService.getUserOrders(userId)
+          apiService.getUserProfile(currentUser.id, currentUser.role),
+          apiService.getUserOrders(currentUser.id)
         ]);
-        
-        setProfile(profileData);
+
+        setProfile(profileData ?? {
+          id: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          phone: currentUser.phone,
+        });
         setOrders(ordersData);
       } catch (error) {
         console.error('Failed to fetch profile data:', error);
+        setProfile({
+          id: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          phone: currentUser.phone,
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [navigate]);
 
   const isMobile = windowWidth < 1024;
 
@@ -576,12 +594,26 @@ export default function ProfilePage() {
           maxWidth: 1100, margin: "0 auto",
           display: "flex", flexDirection: isMobile ? "column" : "row", gap: 24, alignItems: "flex-start",
         }}>
-          <Sidebar active={active} setActive={setActive} isMobile={isMobile} />
+          <Sidebar active={active} setActive={setActive} isMobile={isMobile} onLogoutClick={() => setLogoutOpen(true)} />
           <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
             {content[active as keyof typeof content]}
           </div>
         </div>
       </div>
+
+      <ConfirmPopup
+        isOpen={logoutOpen}
+        title="Logout?"
+        message="You'll need to login again to access your profile, orders and wishlist."
+        confirmText="Logout"
+        cancelText="Cancel"
+        variant="danger"
+        onCancel={() => setLogoutOpen(false)}
+        onConfirm={() => {
+          setLogoutOpen(false);
+          authService.logout();
+        }}
+      />
     </>
   );
 }

@@ -35,217 +35,147 @@ const SearchIcon = () => (
 );
 
 function GoldRatePopup() {
-  const [goldRates, setGoldRates] = useState<any>(null);
+  const [rateData, setRateData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   useEffect(() => {
-    const fetchGoldRates = async () => {
+    (async () => {
       try {
         const data = await apiService.getDailyMetalRates();
-        console.log('Gold rates data:', data);
-        setGoldRates(data.data || data);
-      } catch (error) {
-        console.error('Failed to fetch gold rates:', error);
-        // Keep fallback data if API fails
+        const arr = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+        setRateData(arr[0] || null);
+      } catch (e) {
+        console.error('Failed to fetch gold rates:', e);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchGoldRates();
+    })();
   }, []);
 
-  // Parse API data based on the Postman response structure
-  const parseGoldRates = (apiData: any) => {
-    if (!apiData || !Array.isArray(apiData) || apiData.length === 0) {
-      return [];
-    }
-
-    const rates = [];
-    const rateData = apiData[0]; // Get first object from array
-
-    // Add rates based on API structure
-    if (rateData.gold_24k) {
-      rates.push({
-        label: "24K Gold",
-        rate: `₹${parseFloat(rateData.gold_24k).toLocaleString('en-IN')}`,
-        unit: "per 10 grams"
-      });
-    }
-
-    if (rateData.gold_22k) {
-      rates.push({
-        label: "22K Gold", 
-        rate: `₹${parseFloat(rateData.gold_22k).toLocaleString('en-IN')}`,
-        unit: "per 10 grams"
-      });
-    }
-
-    if (rateData.gold_18k) {
-      rates.push({
-        label: "18K Gold",
-        rate: `₹${parseFloat(rateData.gold_18k).toLocaleString('en-IN')}`,
-        unit: "per 10 grams"
-      });
-    }
-
-    if (rateData.silver_rate) {
-      rates.push({
-        label: "Silver",
-        rate: `₹${parseFloat(rateData.silver_rate).toLocaleString('en-IN')}`,
-        unit: "per kg"
-      });
-    }
-
-    if (rateData.platinum_rate) {
-      rates.push({
-        label: "Platinum",
-        rate: `₹${parseFloat(rateData.platinum_rate).toLocaleString('en-IN')}`,
-        unit: "per 10 grams"
-      });
-    }
-
-    return rates;
-  };
-
-  // Fallback rates if API fails
-  const fallbackRates = [
-    { label: "24K Gold", rate: "₹55,535", unit: "per 10 grams" },
-    { label: "22K Gold", rate: "₹14,240", unit: "per 10 grams" },
-    { label: "18K Gold", rate: "₹11,651", unit: "per 10 grams" },
-    { label: "Silver", rate: "₹400", unit: "per kg" },
-    { label: "Platinum", rate: "₹6,698", unit: "per 10 grams" },
+  const GST = 0.03;
+  // Fallback matches the reference card
+  const fallback = { gold_24k: 14845, gold_22k: 13670, gold_18k: 10645 };
+  const src = rateData || fallback;
+  const r24 = Number(src.gold_24k || 0);
+  // If the API only returns 24K, derive 22K and 18K from karat ratios
+  const r22 = Number(src.gold_22k) || r24 * (22 / 24); // 91.66% of 24K
+  const r18 = Number(src.gold_18k) || r24 * (18 / 24); // 75%   of 24K
+  const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
+console.log(rateData,"ratedataaaaaaaaaaaa")
+  const rows = [
+    { karat: '24 KTS (999)',   tax: 'Including 3 % GST', price: fmt(r24 * 100 * (1 + GST)), unit: '(100 Grams)' },
+    { karat: '22 KTS (91.65)', tax: 'Without 3 % GST',    price: fmt(r22),                   unit: '(Per Grams)' },
+    { karat: '22 KTS (91.65)', tax: 'Including 3 % GST',  price: fmt(r22 * (1 + GST)),       unit: '(Per Grams)' },
+    { karat: '18 KTS (750)',   tax: 'Without 3 % GST',    price: fmt(r18),                   unit: '(Per Grams)' },
+    { karat: '18 KTS (750)',   tax: 'Including 3 % GST',  price: fmt(r18 * (1 + GST)),       unit: '(Per Grams)' },
   ];
 
-  const displayRates = goldRates ? parseGoldRates(goldRates) : fallbackRates;
+  const PhoneIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+  const PinIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
 
   return (
     <div style={{
-      width: isMobile ? 280 : 320,
-      backgroundColor: "#fff",
-      border: "1px solid #e5e7eb",
-      borderRadius: "12px",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-      padding: isMobile ? "20px 16px" : "24px 20px",
+      width: isMobile ? 300 : 340,
+      borderRadius: 14,
+      boxShadow: '0 14px 36px rgba(0,0,0,0.30)',
       fontFamily: SF,
-      position: "relative",
-      overflow: "hidden"
+      position: 'relative',
+      overflow: 'hidden',
+      color: '#fff',
     }}>
-
-      {/* 🔥 Premium Black Gradient Overlay */}
+      {/* Dark gold bokeh backdrop */}
       <div style={{
-        position: "absolute",
-        inset: 0,
-        background: `
-          radial-gradient(circle at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 100%),
-          linear-gradient(
-            to bottom,
-            rgba(0,0,0,0.85) 0%,
-            rgba(0,0,0,0.6) 30%,
-            rgba(0,0,0,0.5) 60%,
-            rgba(0,0,0,0.9) 100%
-          )
-        `,
-        zIndex: 1
+        position: 'absolute', inset: 0,
+        background: `radial-gradient(circle at 20% 15%, rgba(212,175,55,0.25), transparent 45%),
+                     radial-gradient(circle at 80% 75%, rgba(212,175,55,0.18), transparent 50%),
+                     linear-gradient(160deg, #201610 0%, #140c08 55%, #0c0704 100%)`,
+        zIndex: 0,
       }} />
 
-      <div style={{ position: "relative", zIndex: 2 }}>
-
-        {/* Brand */}
-        <div style={{ marginBottom: 12 }}>
-          <img 
-            src={tamiriLogo} 
-            alt="TAMIRI" 
-          />
+      <div style={{ position: 'relative', zIndex: 1, padding: isMobile ? '20px 18px' : '24px 22px' }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+          <img src={tamiriLogo} alt="TAMIRI JEWELLERS PVT LTD" style={{ maxWidth: 130, height: 'auto' }} />
         </div>
 
         {/* Title */}
         <h2 style={{
-          fontSize: isMobile ? 20 : 24,
-          marginBottom: 10,
-          fontWeight: 500
+          fontSize: isMobile ? 20 : 22,
+          fontWeight: 600,
+          margin: '4px 0 0',
+          textAlign: 'center',
+          fontFamily: "'Times New Roman', Times, serif",
+          letterSpacing: 0.3,
+          color: '#fff',
         }}>
-          Today’s Gold Rate
+          Today's Gold Rate
         </h2>
 
-        {/* Divider */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 18,
-          gap: 10
-        }}>
-          <div style={{ width: 40, height: 1, background: "#d4af37" }} />
-          <div style={{
-            width: 8,
-            height: 8,
-            background: "#d4af37",
-            transform: "rotate(45deg)"
-          }} />
-          <div style={{ width: 40, height: 1, background: "#d4af37" }} />
+        {/* Diamond ornament divider */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, margin: '10px 0 18px' }}>
+          <div style={{ width: 46, height: 1, background: '#d4af37' }} />
+          <div style={{ width: 8, height: 8, background: '#d4af37', transform: 'rotate(45deg)' }} />
+          <div style={{ width: 46, height: 1, background: '#d4af37' }} />
         </div>
-
-        {/* Rates */}
+        {/* e8d9a8 */}
+        {/* Rate rows */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#ddd' }}>
-            Loading rates...
-          </div>
+          <div style={{ textAlign: 'center', padding: '20px', color: '#d4af37' }}>Loading rates…</div>
         ) : (
-          displayRates.map((item: any, idx: number) => (
-            <div key={idx} style={{ marginBottom: 16 }}>
-
-              {/* Label */}
-              <div style={{
-                fontSize: 12,
-                color: "#ddd",
-                marginBottom: 6
-              }}>
-                {item.label} &nbsp; – &nbsp; {item.tax}
+          rows.map((row, i) => (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: '#fff', padding: '0 8px 4px' }}>
+                <span>{row.karat}</span>
+                <span>–</span>
+                <span>{row.tax}</span>
               </div>
-
-              {/* Price Pill */}
               <div style={{
-                border: "1px solid rgba(255,255,255,0.7)",
-                borderRadius: 30,
-                padding: "6px 14px",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                border: '1px solid #fff',
+                borderRadius: 999,
+                padding: '7px 16px',
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
                 gap: 10,
-                minWidth: 230,
-                backdropFilter: "blur(2px)"
+                background: 'rgba(255,255,255,0.03)',
               }}>
-                <span style={{
-                  fontSize: isMobile ? 16 : 18,
-                  fontWeight: "bold"
-                }}>
-                  {item.rate}
+                <span style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, fontFamily: "'Times New Roman', Times, serif" }}>
+                  {row.price}/-
                 </span>
-
-                <span style={{
-                  fontSize: 13,
-                  color: "#eee"
-                }}>
-                  {item.unit}
-                </span>
+                <span style={{ fontSize: 12, color: '#fff' }}>{row.unit}</span>
               </div>
-
             </div>
           ))
         )}
 
         {/* Phone */}
-        <div style={{
-          marginTop: 18,
-          fontSize: 18,
-          fontWeight: "bold",
-          letterSpacing: 2
-        }}>
-          +91 86625 76870
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18, padding: '0 4px' }}>
+          <PhoneIcon />
+          <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: 1.5 }}>+91 86625 76870</span>
         </div>
 
+        {/* Address */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 10, padding: '0 4px' }}>
+          <div style={{ marginTop: 3 }}><PinIcon /></div>
+          <span style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.5 }}>
+            Rajagopalachari Street, Governorpet, Vijayawada , 520002
+          </span>
+        </div>
+
+        {/* Fine print */}
+        <div style={{ textAlign: 'center', fontSize: 10, color: '#fff', marginTop: 14, letterSpacing: 0.4 }}>
+          (SRI SK JEWELS - A UNIT OF TAMIRI JEWELLERS PVT LTD)
+        </div>
       </div>
     </div>
   );
@@ -502,8 +432,8 @@ export default function TamiriNavbar() {
   };
 
   // Dynamic padding for desktop nav items based on width
-  const navItemPadding = windowWidth < 1280 ? "0 15px" : "0 28px";
-  const navItemFontSize = windowWidth < 1280 ? "13px" : "15px";
+  const navItemPaddingX = windowWidth < 1280 ? 26 : 52;
+  const navItemPadding = `0 ${navItemPaddingX}px`;
 
   const knowJewelleryPaths = [
     '/jewellery-buying-guide', '/4-cs-of-diamonds', '/lab-vs-natural-diamonds',
@@ -534,7 +464,7 @@ export default function TamiriNavbar() {
     { label: "GALLERY", path: "/products", isActive: isActiveRoute('/products') },
     { label: "KNOW YOUR JEWELLERY", path: "/know-your-jewellery", isActive: isKnowJewelleryActive(), hasDropdown: true, dropdownType: 'know' },
     { label: "CUSTOMER SERVICES", path: null, isActive: isCustomerServicesActive(), hasDropdown: true, dropdownType: 'customer' },
-    { label: "ABOUT", path: "/about", isActive: isActiveRoute('/about') },
+    { label: "ABOUT US", path: "/about", isActive: isActiveRoute('/about') },
   ];
 
   // Mobile Menu Component
@@ -673,20 +603,22 @@ export default function TamiriNavbar() {
       {!isMobile && (
         <nav
           style={{
-            background: "#ffffff",
+            // background: "#ffffff",
             borderBottom: "1px solid rgba(0,0,0,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            background: `url(${headerBg}) no-repeat center center`,
             height: "56px",
             width: "100%",
             zIndex: 1000,
             position: "sticky",
             top: 0,
             boxShadow: "0 2px 10px rgba(0,0,0,0.05)",
+            fontFamily: SF,
           }}
         >
-          <div style={{ display: "flex" }}>
+          <div style={{ display: "flex", fontSize: '15px', fontWeight: '500', fontFamily: 'inherit' }}>
             {navItems.map((item) => {
               const isActive = item.isActive;
               const isGoldRate = item.isGoldRate;
@@ -720,12 +652,12 @@ export default function TamiriNavbar() {
                         alignItems: "center",
                         justifyContent: "center",
                         position: "relative",
-                        fontFamily: SF,
-                        fontSize: navItemFontSize,
-                        fontWeight: "510",
+                        fontFamily: 'inherit',
+                        fontSize: '15px',
+                        fontWeight: '500',
                         lineHeight: "100%",
                         letterSpacing: "0%",
-                        color: isActive ? "#E4AC14" : "#1a1a1a",
+                        color: isActive ? "#E4AC14" : "#6b7280",
                         textTransform: "uppercase",
                         whiteSpace: "nowrap",
                         transition: "color 0.2s",
@@ -736,7 +668,7 @@ export default function TamiriNavbar() {
                         if (!isActive) e.currentTarget.style.color = "#E4AC14";
                       }}
                       onMouseLeave={e => {
-                        if (!isActive) e.currentTarget.style.color = "#1a1a1a";
+                        if (!isActive) e.currentTarget.style.color = "#6b7280";
                       }}
                     >
                       {item.label}
@@ -746,8 +678,8 @@ export default function TamiriNavbar() {
                           style={{
                             position: "absolute",
                             bottom: "0px",
-                            left: "28px",
-                            right: "28px",
+                            left: `${navItemPaddingX}px`,
+                            right: `${navItemPaddingX}px`,
                             height: "2px",
                             background: "#E4AC14",
                             borderRadius: "1px",
@@ -767,12 +699,12 @@ export default function TamiriNavbar() {
                         alignItems: "center",
                         justifyContent: "center",
                         position: "relative",
-                        fontFamily: SF,
-                        fontSize: navItemFontSize,
-                        fontWeight: "510",
+                        fontFamily: 'inherit',
+                        fontSize: '15px',
+                        fontWeight: '500',
                         lineHeight: "100%",
                         letterSpacing: "0%",
-                        color: isActive ? "#E4AC14" : "#1a1a1a",
+                        color: isActive ? "#E4AC14" : "#6b7280",
                         textTransform: "uppercase",
                         whiteSpace: "nowrap",
                         transition: "color 0.2s",
@@ -782,7 +714,7 @@ export default function TamiriNavbar() {
                         if (!isActive && !isGoldRate) e.currentTarget.style.color = "#E4AC14";
                       }}
                       onMouseLeave={e => {
-                        if (!isActive && !isGoldRate) e.currentTarget.style.color = "#1a1a1a";
+                        if (!isActive && !isGoldRate) e.currentTarget.style.color = "#6b7280";
                       }}
                     >
                       {item.label}
@@ -792,8 +724,8 @@ export default function TamiriNavbar() {
                           style={{
                             position: "absolute",
                             bottom: "0px",
-                            left: "28px",
-                            right: "28px",
+                            left: `${navItemPaddingX}px`,
+                            right: `${navItemPaddingX}px`,
                             height: "2px",
                             background: "#E4AC14",
                             borderRadius: "1px",

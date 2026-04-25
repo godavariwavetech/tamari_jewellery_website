@@ -104,19 +104,19 @@ const Card = ({ section }: { section: any }) => {
         <h3 style={{
           fontSize: '17px',
           fontWeight: '700',
-          color: '#1a1a1a',
+          color: '#1A1E23',
           margin: '0 0 5px',
           letterSpacing: '0.4px',
-          fontFamily: 'Georgia, serif',
+          fontFamily: "'Times New Roman', Times, serif",
         }}>
           {section.title}
         </h3>
         <p style={{
           fontSize: '13px',
-          color: '#555',
+          color: '#55616B',
           margin: 0,
           lineHeight: '1.5',
-          fontFamily: 'Georgia, serif',
+          fontFamily: "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif",
           fontWeight: '400',
         }}>
           {section.subtitle}
@@ -213,19 +213,19 @@ const KnowYourJewellery = () => {
         <h1 style={{
           fontSize: '34px',
           fontWeight: '800',
-          color: '#1a1a1a',
+          color: '#000000',
           margin: '0 0 22px',
           letterSpacing: '3px',
-          fontFamily: 'Georgia, serif',
+          fontFamily: "'Times New Roman', Times, serif",
         }}>
           KNOW YOUR JEWELLERY
         </h1>
         <p style={{
           fontSize: '15.5px',
-          color: '#555',
+          color: '#1a1a1a',
           lineHeight: '1.75',
           margin: 0,
-          fontFamily: 'Georgia, serif',
+          fontFamily: "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif",
         }}>
           At <Gold>Tamiri Jewellers Pvt Ltd</Gold>, choosing fine jewellery should be as meaningful as owning it.
           Understanding the details behind craftsmanship, quality, and care empowers you to make confident and informed decisions.
@@ -254,7 +254,7 @@ const KnowYourJewellery = () => {
       </div>
 
       <div style={{
-        maxWidth: '1000px',
+        maxWidth: '1200px',
         margin: '74px auto 0',
         textAlign: 'center',
         padding: '0 20px',
@@ -262,10 +262,10 @@ const KnowYourJewellery = () => {
         {bottomParas.map((text, i) => (
           <p key={i} style={{
             fontSize: '15px',
-            color: '#555',
+            color: '#1A1E23',
             lineHeight: '1.85',
             marginBottom: i < bottomParas.length - 1 ? '18px' : 0,
-            fontFamily: 'Georgia, serif',
+            fontFamily: "'Times New Roman', Times, serif",
           }}>
             {text}
           </p>

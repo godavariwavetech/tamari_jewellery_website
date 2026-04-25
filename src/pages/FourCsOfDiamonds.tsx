@@ -69,6 +69,7 @@ const FourCsOfDiamonds = () => {
     color: '#444',
     lineHeight: '1.75',
     margin: '0 0 10px',
+    fontFamily: "'Times New Roman', Times, serif",
   };
 
   const subHead = {
@@ -114,7 +115,7 @@ const FourCsOfDiamonds = () => {
         {/* Two-col: text left, quality scale right */}
         <div style={{ display: 'flex', gap: '28px', marginBottom: '18px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 280px' }}>
-            <p style={bodyText}>
+            <p style={{fontFamily: "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif"}}>
               The <Gold>Cut</Gold> of a diamond is the most important factor influencing its brilliance. It determines how beautifully light enters, reflects, and sparkles within the stone.
             </p>
             <p style={subHead}>Why Cut Matters</p>

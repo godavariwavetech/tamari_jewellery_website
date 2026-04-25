@@ -27,13 +27,14 @@ import FAQs from './pages/FAQs';
 import About from './pages/About';
 
 import Signup from './pages/Signup';
+import OTPVerification from './pages/OTPVerification';
 
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
 const AppContent = () => {
   const location = useLocation();
-  const showHeaderFooter = !['/login', '/signup'].includes(location.pathname);
+  const showHeaderFooter = !['/login', '/signup', '/otp'].includes(location.pathname);
   
   const [, setWidth] = useState(window.innerWidth);
   useEffect(() => {
@@ -61,6 +62,7 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/otp" element={<OTPVerification />} />
           
           
           <Route path="/products" element={<ProductList />} />

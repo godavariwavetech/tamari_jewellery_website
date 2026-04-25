@@ -36,8 +36,11 @@ const HeroBanner = ({ w }: HeroBannerProps) => {
     try {
       if (isInitial) setLoading(true);
       const banners = await apiService.getBanners();
-      if (banners && banners.length > 0) {
-        setBannerImages(banners.map(b => b.banner_image));
+      const urls = (banners || [])
+        .map(b => b.banner_image)
+        .filter((url): url is string => typeof url === 'string' && url.trim().length > 0);
+      if (urls.length > 0) {
+        setBannerImages(urls);
       }
     } catch (error) {
       console.warn('Failed to fetch banners, using defaults:', error);
@@ -45,10 +48,18 @@ const HeroBanner = ({ w }: HeroBannerProps) => {
       if (isInitial) setLoading(false);
     }
   }, []);
-  
+
   useEffect(() => {
     fetchBanners(true);
   }, [fetchBanners]);
+
+  // Preload every banner image so transitions never show a blank frame
+  useEffect(() => {
+    bannerImages.forEach(src => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [bannerImages]);
   
   // Reset carousel index when banners change to avoid blanks after navigation
   useEffect(() => {
@@ -176,15 +187,17 @@ const HeroBanner = ({ w }: HeroBannerProps) => {
                 borderRadius: isMobile ? "0" : "20px",
                 overflow: "hidden",
                 position: "relative",
-                background: "#000",
+                background: "#f5eedd",
               }}>
                 <img
                   src={img}
                   alt={`Banner ${index}`}
+                  loading="eager"
+                  decoding="async"
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectFit: isActive ? "contain" : "cover",
+                    objectFit: "cover",
                     objectPosition: "center",
                   }}
                 />

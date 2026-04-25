@@ -1,19 +1,17 @@
-import { useState, useRef, useLayoutEffect } from 'react';
+import { useState, useLayoutEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiService } from '../services/api';
+import { apiService, type AccountRole } from '../services/api';
+import RolePickerPopup from '../components/RolePickerPopup';
 import backgroundImg from '../assets/login-background.jpg';
 import logo from '../assets/logo-removebg.png';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState('enter-mobile'); // 'enter-mobile' | 'verify-otp'
   const [mobileNumber, setMobileNumber] = useState('');
-  const [otp, setOtp] = useState(new Array(6).fill(''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [rolePickerOpen, setRolePickerOpen] = useState(false);
 
   useLayoutEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -21,6 +19,24 @@ const LoginPage = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const sendOtpAndContinue = async (role: AccountRole) => {
+    try {
+      setLoading(true);
+      setError('');
+      const otpResponse = await apiService.getUserLoginOTP(mobileNumber);
+      if (otpResponse) {
+        navigate('/otp', { state: { mobileNumber, role } });
+      } else {
+        setError('Failed to send OTP');
+      }
+    } catch (err) {
+      setError('Failed to send OTP. Please try again.');
+      console.error('Error sending OTP:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleMobileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,37 +48,41 @@ const LoginPage = () => {
     try {
       setLoading(true);
       setError('');
-      
-      // First check user status
+
       const statusResponse = await apiService.checkUserStatus(mobileNumber);
-      
+
       if (!statusResponse.success) {
         setError(statusResponse.message || 'Failed to check user status');
         return;
       }
-      
-      // Handle different user statuses
+
       switch (statusResponse.status) {
         case 'not_registered':
           setError('User not found. Please signup first.');
           setTimeout(() => navigate('/signup'), 2000);
           return;
-          
+
         case 'pending':
           setError('Your signup request is pending admin approval. Please wait for approval.');
           return;
-          
-        case 'registered':
-          // User is approved, proceed with OTP
-          const otpResponse = await apiService.getUserLoginOTP(mobileNumber);
-          
-          if (otpResponse.success) {
-            setStep('verify-otp');
-          } else {
-            setError(otpResponse.message || 'Failed to send OTP');
+
+        case 'registered': {
+          const accounts = statusResponse.accounts || [];
+
+          if (accounts.length === 0) {
+            setError('No active account found for this number. Please signup.');
+            return;
           }
-          break;
-          
+
+          if (accounts.length > 1) {
+            setRolePickerOpen(true);
+            return;
+          }
+
+          await sendOtpAndContinue(accounts[0]);
+          return;
+        }
+
         default:
           setError('Unknown user status. Please contact support.');
           return;
@@ -75,62 +95,9 @@ const LoginPage = () => {
     }
   };
 
-  const handleOtpSubmit = async () => {
-    const otpString = otp.join('');
-    if (otpString.length !== 6) {
-      setError('Please enter complete OTP');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError('');
-      const response = await apiService.customerLogin(mobileNumber, otpString);
-      
-      if (response.success) {
-        // Store user data in localStorage
-        if (response.user_id) {
-          localStorage.setItem('userId', response.user_id.toString());
-        }
-        if (response.token) {
-          localStorage.setItem('authToken', response.token);
-        }
-        
-        // Navigate to home page
-        navigate('/');
-      } else {
-        setError(response.message || 'Invalid OTP');
-      }
-    } catch (err) {
-      setError('Failed to verify OTP. Please try again.');
-      console.error('Error verifying OTP:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOtpChange = (element: HTMLInputElement, index: number) => {
-    if (isNaN(Number(element.value))) return; // Only allow numbers
-
-    const newOtp = [...otp];
-    newOtp[index] = element.value;
-    setOtp(newOtp);
-
-    // Focus next input
-    if (element.nextSibling && element.value) {
-      (element.nextSibling as HTMLInputElement).focus();
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === 'Backspace' && !otp[index] && inputRefs.current[index - 1]) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
   const isMobile = windowWidth <= 1024;
 
-  const maskedMobile = `******${mobileNumber.slice(-4)}`;
+
 
   return (
     <div style={{
@@ -185,7 +152,7 @@ const LoginPage = () => {
             </div>
           )}
 
-          {step === 'enter-mobile' && (
+          {(
             <>
               <h1 style={{ fontSize: '28px', fontWeight: 600, color: '#1a1a1a', marginBottom: '12px' }}>Welcome to Tamiri Jewellers</h1>
               <p style={{ fontSize: '18px', color: '#666', marginBottom: '28px' }}>Enter Mobile Number</p>
@@ -252,69 +219,18 @@ const LoginPage = () => {
               </form>
             </>
           )}
-
-          {step === 'verify-otp' && (
-            <>
-              <h1 style={{ fontSize: '28px', fontWeight: 600, color: '#1a1a1a', marginBottom: '12px' }}>Verify With OTP</h1>
-              <p style={{ fontSize: '18px', color: '#666', marginBottom: '28px' }}>Sent to {maskedMobile}</p>
-              {error && (
-                <div style={{ 
-                  background: '#fee2e2', 
-                  color: '#dc2626', 
-                  padding: '12px', 
-                  borderRadius: '8px', 
-                  marginBottom: '20px',
-                  fontSize: '14px'
-                }}>
-                  {error}
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '28px' }}>
-                {otp.map((data, index) => (
-                  <input
-                    key={index}
-                    type="text"
-                    maxLength={1}
-                    value={data}
-                    onChange={e => handleOtpChange(e.target, index)}
-                    onKeyDown={e => handleKeyDown(e, index)}
-                    ref={el => { inputRefs.current[index] = el; }}
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      textAlign: 'center',
-                      fontSize: '20px',
-                      border: '1px solid #ccc',
-                      borderRadius: '8px',
-                    }}
-                  />
-                ))}
-              </div>
-              <button 
-                onClick={handleOtpSubmit}
-                disabled={loading || otp.join('').length !== 6}
-                style={{
-                  width: '100%',
-                  height: '48px',
-                  background: loading || otp.join('').length !== 6 ? '#ccc' : '#E4AC14',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: loading || otp.join('').length !== 6 ? 'not-allowed' : 'pointer',
-                  marginBottom: '20px'
-                }}
-              >
-                {loading ? 'Verifying...' : 'Verify'}
-              </button>
-              <p style={{ fontSize: '16px', color: '#888', textAlign: 'center' }}>
-                By continuing, I agree to <Link to="/terms" style={{ color: '#E4AC14', textDecoration: 'underline' }}>Terms of Use</Link> & <Link to="/privacy" style={{ color: '#E4AC14', textDecoration: 'underline' }}>Privacy Policy</Link>
-              </p>
-            </>
-          )}
         </div>
       </div>
+
+      <RolePickerPopup
+        isOpen={rolePickerOpen}
+        phone={mobileNumber}
+        onPick={(role) => {
+          setRolePickerOpen(false);
+          sendOtpAndContinue(role);
+        }}
+        onCancel={() => setRolePickerOpen(false)}
+      />
     </div>
   );
 };

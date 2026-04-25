@@ -1,41 +1,18 @@
 import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { authService } from '../services/auth';
-import product from "../assets/product-image.png";
-const X = ({ size = 24, color = 'currentColor', strokeWidth = 2, ...props }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke={color}
-    strokeWidth={strokeWidth}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
+import { useCurrency } from '../context/CurrencyContext';
+import { dispatchCartUpdate, dispatchWishlistUpdate, WISHLIST_UPDATE_EVENT } from '../utils/cartUtils';
+import fallbackImg from "../assets/product-image.png";
+
+const SF = "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif";
+const GOLD = "#E4AC14";
+
+const X = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
-const ShoppingCart = ({ size = 24, color = 'currentColor', strokeWidth = 2, ...props }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke={color}
-    strokeWidth={strokeWidth}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <circle cx="9" cy="21" r="1" />
-    <circle cx="20" cy="21" r="1" />
-    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
   </svg>
 );
 
@@ -43,40 +20,51 @@ interface WishlistItem {
   id: number;
   product_id: number;
   product_name: string;
-  price: number;
   product_image: string;
+  price: number;
   wishlist_item_id: number;
 }
 
 const Wishlist = () => {
+  const navigate = useNavigate();
+  const { format } = useCurrency(); // INR → active currency (INR/USD)
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const [busyCart, setBusyCart] = useState<number | null>(null);
+
+  const showToast = (text: string, kind: 'ok' | 'err') => {
+    setToast({ text, kind });
+    setTimeout(() => setToast(null), 2200);
+  };
 
   useEffect(() => {
     fetchWishlistItems();
+    const refresh = () => fetchWishlistItems();
+    window.addEventListener(WISHLIST_UPDATE_EVENT, refresh);
+    return () => window.removeEventListener(WISHLIST_UPDATE_EVENT, refresh);
   }, []);
 
   const fetchWishlistItems = async () => {
     const user = authService.getCurrentUser();
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) { setLoading(false); return; }
 
     try {
       setLoading(true);
-      const response = await apiService.getWishlist(user.id);
+      const response = await apiService.getWishlist(user.id, user.role);
       if (response.success && response.data) {
-        const wishlistItems: WishlistItem[] = response.data.map((item: any) => ({
+        const list: WishlistItem[] = response.data.map((item: any) => ({
           id: item.product_id,
           product_id: item.product_id,
           product_name: item.product_name,
-          price: item.price || item.total_price,
           product_image: item.product_image,
-          wishlist_item_id: item.id,
+          price: item.price || item.total_price || 0,
+          wishlist_item_id: item.wishlist_id ?? item.id,
         }));
-        setItems(wishlistItems);
+        setItems(list);
+      } else {
+        setItems([]);
       }
     } catch (err) {
       setError('Failed to load wishlist items');
@@ -86,45 +74,39 @@ const Wishlist = () => {
     }
   };
 
-  const removeItem = async (id: number) => {
+  const removeItem = async (item: WishlistItem) => {
     const user = authService.getCurrentUser();
     if (!user) return;
-
-    try {
-      const item = items.find(i => i.id === id);
-      if (!item) return;
-
-      // Update locally first
-      setItems((prev) => prev.filter((item) => item.id !== id));
-      
-      // Then remove from server
-      await apiService.deleteWishlistItem(user.id, item.wishlist_item_id);
-    } catch (error) {
-      console.error('Failed to remove from wishlist:', error);
-      // Revert on error
-      fetchWishlistItems();
+    const previous = items;
+    setItems(prev => prev.filter(i => i.id !== item.id));
+    const res = await apiService.deleteWishlistItem(user.id, item.wishlist_item_id);
+    if (res.success) {
+      dispatchWishlistUpdate();
+    } else {
+      setItems(previous);
+      showToast('Failed to remove from wishlist', 'err');
     }
   };
 
   const addToCart = async (item: WishlistItem) => {
     const user = authService.getCurrentUser();
-    if (!user) {
-      alert('Please login to add items to cart');
-      return;
+    if (!user) { navigate('/login'); return; }
+    setBusyCart(item.id);
+    const res = await apiService.addToCart(user.id, item.product_id, 1, 0, user.role);
+    if (res.success) {
+      dispatchCartUpdate();
+      showToast('Added to cart', 'ok');
+    } else if (res.alreadyExists) {
+      showToast(res.message || 'Already in your cart', 'err');
+    } else {
+      showToast(res.message || 'Failed to add to cart', 'err');
     }
-
-    try {
-      await apiService.addToCart(user.id, item.product_id, 1);
-      alert('Item added to cart successfully!');
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
-      alert('Failed to add item to cart');
-    }
+    setBusyCart(null);
   };
 
   if (loading) {
     return (
-      <div style={{ backgroundColor: '#f5f5f3', minHeight: '100vh', fontFamily: "'Cormorant Garamond', Georgia, serif", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: '#f9f9f7', minHeight: '100vh', fontFamily: SF, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', color: '#666' }}>Loading wishlist...</div>
       </div>
     );
@@ -132,7 +114,7 @@ const Wishlist = () => {
 
   if (error) {
     return (
-      <div style={{ backgroundColor: '#f5f5f3', minHeight: '100vh', fontFamily: "'Cormorant Garamond', Georgia, serif", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: '#f9f9f7', minHeight: '100vh', fontFamily: SF, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', color: '#e74c3c' }}>{error}</div>
       </div>
     );
@@ -140,14 +122,14 @@ const Wishlist = () => {
 
   if (!authService.isAuthenticated()) {
     return (
-      <div style={{ backgroundColor: '#f5f5f3', minHeight: '100vh', fontFamily: "'Cormorant Garamond', Georgia, serif", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: '#f9f9f7', minHeight: '100vh', fontFamily: SF, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', color: '#666' }}>
           <p>Please login to view your wishlist</p>
-          <button 
-            onClick={() => window.location.href = '/login'}
+          <button
+            onClick={() => navigate('/login')}
             style={{
-              background: '#c9960c', color: '#fff', border: 'none', borderRadius: 8,
-              padding: '12px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer'
+              background: GOLD, color: '#fff', border: 'none', borderRadius: 8,
+              padding: '12px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginTop: 12
             }}
           >
             Login
@@ -158,172 +140,140 @@ const Wishlist = () => {
   }
 
   return (
-    <div
-      style={{ backgroundColor: '#f5f5f3', minHeight: '100vh', fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-    >
+    <div style={{ backgroundColor: '#f9f9f7', minHeight: '100vh', fontFamily: SF }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500&display=swap');
-
-        .wishlist-card {
-          background: #fff;
-          border-radius: 12px;
-          overflow: hidden;
-          position: relative;
-          transition: box-shadow 0.25s ease, transform 0.25s ease;
-        }
-        .wishlist-card:hover {
-          box-shadow: 0 8px 32px rgba(0,0,0,0.10);
-          transform: translateY(-3px);
-        }
-        .remove-btn {
-          position: absolute;
-          top: 12px;
-          right: 12px;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 1.5px solid #d1d1d1;
-          background: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: background 0.2s, border-color 0.2s;
-          z-index: 2;
-        }
-        .remove-btn:hover {
-          background: #fee2e2;
-          border-color: #f87171;
-        }
-        .img-wrap {
-          background: #f5f5f3;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 28px 20px 20px;
-          height: 220px;
-        }
-        .img-wrap img {
-          max-height: 160px;
-          max-width: 100%;
-          object-fit: contain;
-        }
-        .card-body {
-          padding: 16px 16px 18px;
-        }
-        .card-name {
-          font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: 15px;
-          font-weight: 600;
-          color: #1a1a1a;
-          line-height: 1.4;
-          margin-bottom: 10px;
-          text-align: center;
-        }
-        .price-row {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          margin-bottom: 14px;
-        }
-        .price-sale {
-          font-family: 'Jost', sans-serif;
-          font-size: 15px;
-          font-weight: 500;
-          color: #1a1a1a;
-        }
-        .price-original {
-          font-family: 'Jost', sans-serif;
-          font-size: 13px;
-          font-weight: 400;
-          color: #aaa;
-          text-decoration: line-through;
-        }
-        .add-cart-btn {
-          width: 100%;
-          background: #c9960c;
-          color: #fff;
-          border: none;
-          border-radius: 6px;
-          padding: 11px 0;
-          font-family: 'Jost', sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          transition: background 0.2s;
-        }
-        .add-cart-btn:hover {
-          background: #b8850a;
-        }
-        .grid-4 {
+        .wl-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 22px;
+          grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+          gap: 18px;
         }
-        @media (max-width: 1100px) {
-          .grid-4 { grid-template-columns: repeat(3, 1fr); }
-        }
-        @media (max-width: 768px) {
-          .grid-4 { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 480px) {
-          .grid-4 { grid-template-columns: 1fr; }
-        }
-        .page-title {
-          font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: 34px;
-          font-weight: 700;
-          color: #1a1a1a;
-          text-align: center;
-          margin-bottom: 36px;
-          letter-spacing: 0.01em;
-        }
+        @media (max-width: 480px) { .wl-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
       `}</style>
 
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '48px 24px' }}>
-        <h1 className="page-title">My Wishlist</h1>
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+          padding: '10px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+          background: toast.kind === 'ok' ? '#dcfce7' : '#fee2e2',
+          color: toast.kind === 'ok' ? '#166534' : '#991b1b',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.12)', zIndex: 1000,
+        }}>
+          {toast.text}
+        </div>
+      )}
+
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '48px 24px' }}>
+        <h1 style={{
+          fontFamily: SF, fontSize: 28, fontWeight: 700, color: '#111827',
+          textAlign: 'center', margin: '0 0 36px', letterSpacing: -0.3,
+        }}>
+          My Wishlist
+        </h1>
 
         {items.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#888', fontFamily: "'Jost', sans-serif", fontSize: 16, paddingTop: 60 }}>
+          <div style={{ textAlign: 'center', color: '#6b7280', fontSize: 15, paddingTop: 60 }}>
             Your wishlist is empty.
           </div>
         ) : (
-          <div className="grid-4">
-            {items.map((item) => (
-              <div className="wishlist-card" key={item.id}>
-                <button
-                  className="remove-btn"
-                  onClick={() => removeItem(item.id)}
-                  aria-label="Remove item"
-                >
-                  <X size={14} color="#555" strokeWidth={2.5} />
-                </button>
-
-                <div className="img-wrap">
-                  <img src={item.product_image || product} alt={item.product_name} />
-                </div>
-
-                <div className="card-body">
-                  <p className="card-name">{item.product_name}</p>
-
-                  <div className="price-row">
-                    <span className="price-sale">₹{item.price.toLocaleString('en-IN')}</span>
-                  </div>
-
-                  <button className="add-cart-btn" onClick={() => addToCart(item)}>
-                    <ShoppingCart size={15} strokeWidth={2} />
-                    Add to Cart
+          <div className="wl-grid">
+            {items.map(item => {
+              const mrp = Math.round(item.price * 1.12);
+              return (
+                <div key={item.id} style={{
+                  background: '#fff',
+                  borderRadius: 14,
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}>
+                  {/* × Remove button */}
+                  <button
+                    onClick={() => removeItem(item)}
+                    aria-label="Remove from wishlist"
+                    style={{
+                      position: 'absolute', top: 12, right: 12,
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: '#fff', border: '1.5px solid #d1d5db',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', zIndex: 2,
+                      transition: 'background 0.2s, border-color 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.borderColor = '#f87171'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#d1d5db'; }}
+                  >
+                    <X size={14} />
                   </button>
+
+                  {/* Image — full-bleed, click goes to detail page */}
+                  <Link to={`/product/${item.product_id}`} style={{ display: 'block', textDecoration: 'none' }}>
+                    <div style={{
+                      position: 'relative',
+                      aspectRatio: '1/1',
+                      backgroundColor: '#eef0f3',
+                      overflow: 'hidden',
+                    }}>
+                      <img
+                        src={item.product_image || fallbackImg}
+                        alt={item.product_name}
+                        loading="lazy"
+                        decoding="async"
+                        style={{
+                          position: 'absolute', inset: 0,
+                          width: '100%', height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    </div>
+                  </Link>
+
+                  {/* Info */}
+                  <div style={{ padding: '12px 12px 14px', display: 'flex', flexDirection: 'column', alignItems: 'stretch', flex: 1 }}>
+                    <p style={{
+                      fontFamily: SF, fontSize: 13, fontWeight: 700, color: '#111827',
+                      margin: '0 0 6px', lineHeight: 1.35, textAlign: 'left',
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden', minHeight: '2.7em',
+                    }}>
+                      {item.product_name}
+                    </p>
+
+                    {/* Prices stored in INR; format() converts + formats to active currency */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
+                        {format(item.price, { inputIncludesGst: true })}
+                      </span>
+                      <span style={{ fontSize: 12, color: '#9ca3af', textDecoration: 'line-through' }}>
+                        {format(mrp, { inputIncludesGst: true })}
+                      </span>
+                    </div>
+
+                    {/* Full-width ADD TO CART */}
+                    <button
+                      onClick={() => addToCart(item)}
+                      disabled={busyCart === item.id}
+                      style={{
+                        width: '100%', marginTop: 'auto',
+                        background: GOLD, color: '#fff',
+                        border: 'none', borderRadius: 8,
+                        padding: '9px 0',
+                        fontSize: 11.5, fontWeight: 700, letterSpacing: 0.8,
+                        textTransform: 'uppercase', cursor: busyCart === item.id ? 'wait' : 'pointer',
+                        opacity: busyCart === item.id ? 0.7 : 1,
+                        fontFamily: SF,
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => { if (busyCart !== item.id) e.currentTarget.style.background = '#c8900e'; }}
+                      onMouseLeave={e => e.currentTarget.style.background = GOLD}
+                    >
+                      {busyCart === item.id ? 'Adding…' : 'ADD TO CART'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
