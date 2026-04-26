@@ -596,7 +596,11 @@ function ProductCard({ product }: { product: Product }) {
 
   const materialColor = (product.material_color || "").toLowerCase();
   const availableSwatches = COLOR_SWATCHES.filter(s => s.match(materialColor));
-  const mrp = product.price ? Math.round(product.price * 1.12) : 0; // display MRP ≈ 12% above sale
+  // MRP comes from z_all_products.actual_price. Only render the strikethrough when
+  // it's genuinely higher than the selling price — no fake 12% markup anymore.
+  const mrp = Number(product.actual_price || 0) > Number(product.price || 0)
+    ? Number(product.actual_price)
+    : 0;
 
   const hoverImage = product.product_image_hover && product.product_image_hover !== product.product_image
     ? product.product_image_hover

@@ -490,9 +490,10 @@ function TrendingStyles({ w }: { w: number }) {
                 height: isMobile ? "2.6em" : "auto",
               }}>{p.product_name}</p>
 
-              {/* Price row */}
+              {/* Price row — MRP (actual_price) only shows when it's genuinely higher
+                  than the selling price. Otherwise we just show one clean price, since
+                  rendering identical bold + strikethrough numbers looks like a fake discount. */}
               <div style={{display:"flex", flexDirection:"row", gap:"10px"}}>
-                
               {/* Prices are stored in INR; format() converts to active currency (INR/USD) */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
                 <span style={{
@@ -500,17 +501,19 @@ function TrendingStyles({ w }: { w: number }) {
                   fontSize: isDesktop ? 15 : isTablet ? 14 : 13,
                   fontWeight: 700,
                   color: "#1a1a1a",
-                }}>{format(p.price || p.total_price || 60000, { inputIncludesGst: true })}</span>
+                }}>{format(p.total_price || p.price || 0, { inputIncludesGst: true })}</span>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
-                <span style={{
-                  fontFamily: SF,
-                  textDecoration: "line-through",
-                  fontSize: isDesktop ? 13 : isTablet ? 14 : 13,
-                  fontWeight: 500,
-                  color: "#666666",
-                }}>{format(p.price || p.total_price || 80000, { inputIncludesGst: true })}</span>
-              </div>
+              {Number(p.actual_price || 0) > Number(p.total_price || p.price || 0) && (
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                  <span style={{
+                    fontFamily: SF,
+                    textDecoration: "line-through",
+                    fontSize: isDesktop ? 13 : isTablet ? 14 : 13,
+                    fontWeight: 500,
+                    color: "#666666",
+                  }}>{format(Number(p.actual_price), { inputIncludesGst: true })}</span>
+                </div>
+              )}
               </div>
               
                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 6, marginBottom: 4 }}>

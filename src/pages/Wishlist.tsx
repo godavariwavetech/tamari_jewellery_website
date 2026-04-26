@@ -177,7 +177,10 @@ const Wishlist = () => {
         ) : (
           <div className="wl-grid">
             {items.map(item => {
-              const mrp = Math.round(item.price * 1.12);
+              // Real MRP from product.actual_price — no fake 12% markup.
+              const mrp = Number((item as any).actual_price || 0) > Number(item.price || 0)
+                ? Number((item as any).actual_price)
+                : 0;
               return (
                 <div key={item.id} style={{
                   background: '#fff',
@@ -234,6 +237,7 @@ const Wishlist = () => {
                     <p style={{
                       fontFamily: SF, fontSize: 13, fontWeight: 700, color: '#111827',
                       margin: '0 0 6px', lineHeight: 1.35, textAlign: 'left',
+                      textTransform: 'capitalize',
                       display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                       overflow: 'hidden', minHeight: '2.7em',
                     }}>
@@ -245,9 +249,11 @@ const Wishlist = () => {
                       <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
                         {format(item.price, { inputIncludesGst: true })}
                       </span>
-                      <span style={{ fontSize: 12, color: '#9ca3af', textDecoration: 'line-through' }}>
-                        {format(mrp, { inputIncludesGst: true })}
-                      </span>
+                      {mrp > 0 && (
+                        <span style={{ fontSize: 12, color: '#9ca3af', textDecoration: 'line-through' }}>
+                          {format(mrp, { inputIncludesGst: true })}
+                        </span>
+                      )}
                     </div>
 
                     {/* Full-width ADD TO CART */}

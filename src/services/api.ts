@@ -28,6 +28,8 @@ export interface Product {
   product_image_hover?: string;
   price: number;
   total_price?: number; // Add this optional field
+  actual_price?: number; // MRP from z_all_products — when > total_price, render as strikethrough
+  selling_price?: number;
   category_id: number;
   category_name?: string;
   subcategory_id?: number;
