@@ -5,6 +5,9 @@ const borderLight = "#e8dcc8";
 const textDark = "#222";
 const textMid = "#444";
 
+const QUESTION_FONT = "'Times New Roman', Times, serif";
+const ANSWER_FONT = "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif";
+
 const chevronUp = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={goldColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="18 15 12 9 6 15" />
@@ -230,12 +233,12 @@ function FAQItem({ item, isOpen, onToggle }: FAQItemProps) {
         }}
       >
         <span style={{
-          fontSize: 24,
+          fontSize: 20,
           fontWeight: 600,
-          color: isOpen ? goldColor : textDark,
+          color: goldColor,
           lineHeight: 1.5,
           flex: 1,
-          fontFamily: 'sans-serif',
+          fontFamily: QUESTION_FONT,
         }}>{item.q}</span>
         <span style={{ flexShrink: 0 }}>{isOpen ? chevronUp : chevronDown}</span>
       </button>
@@ -245,21 +248,21 @@ function FAQItem({ item, isOpen, onToggle }: FAQItemProps) {
           paddingRight: 24,
         }}>
           {item.intro && (
-            <p style={{ fontSize: 18, color: textMid, margin: '0 0 6px', fontFamily: 'sans-serif', lineHeight: 1.7 }}>{item.intro}</p>
+            <p style={{ fontSize: 14, color: textMid, margin: '0 0 6px', fontFamily: ANSWER_FONT, lineHeight: 1.7 }}>{item.intro}</p>
           )}
           {item.a && (
-            <p style={{ fontSize: 18, color: textMid, margin: '0 0 6px', fontFamily: 'sans-serif', lineHeight: 1.7 }}>{item.a}</p>
+            <p style={{ fontSize: 14, color: textMid, margin: '0 0 6px', fontFamily: ANSWER_FONT, lineHeight: 1.7 }}>{item.a}</p>
           )}
           {item.sub && (
-            <p style={{ fontSize: 18, color: textMid, margin: '8px 0 4px', fontFamily: 'sans-serif', fontStyle: 'italic' }}>{item.sub}</p>
+            <p style={{ fontSize: 14, color: textMid, margin: '8px 0 4px', fontFamily: ANSWER_FONT, fontStyle: 'italic' }}>{item.sub}</p>
           )}
           {(item.bullets || item.bullets2) && (
             <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
               {(item.bullets || []).map((b, i) => (
-                <li key={i} style={{ fontSize: 18, color: textMid, marginBottom: 4, lineHeight: 1.6, fontFamily: 'sans-serif' }}>{b}</li>
+                <li key={i} style={{ fontSize: 14, color: textMid, marginBottom: 4, lineHeight: 1.6, fontFamily: ANSWER_FONT }}>{b}</li>
               ))}
               {(item.bullets2 || []).map((b, i) => (
-                <li key={i} style={{ fontSize: 18, color: textMid, marginBottom: 4, lineHeight: 1.6, fontFamily: 'sans-serif' }}>{b}</li>
+                <li key={i} style={{ fontSize: 14, color: textMid, marginBottom: 4, lineHeight: 1.6, fontFamily: ANSWER_FONT }}>{b}</li>
               ))}
             </ul>
           )}
@@ -324,11 +327,11 @@ export default function FAQs() {
                 zIndex: 1,
                 background: '#fafaf8',
                 padding: '0 16px',
-                fontSize: 24,
+                fontSize: 18,
                 fontWeight: 700,
                 color: goldColor,
                 letterSpacing: 0.3,
-                fontFamily: 'sans-serif',
+                fontFamily: QUESTION_FONT,
               }}>{section.category}</span>
             </div>
 

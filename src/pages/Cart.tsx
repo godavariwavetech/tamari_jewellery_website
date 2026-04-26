@@ -84,18 +84,18 @@ function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
             <img src={item.product_image || product} alt="Product Image" style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }} />
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 6px", lineHeight: 1.4 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 6px", lineHeight: 1.4, textTransform: "capitalize" }}>
               {item.product_name}
             </p>
             {item.sku_id && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>SKU: {item.sku_id}</p>}
             {(item.metal_name || item.material_color) && (
-              <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+              <p style={{ fontSize: 11, color: "#6b7280", margin: 0, textTransform: "capitalize" }}>
                 Metal: {[item.metal_name, (item as any).karat ? `${(item as any).karat}KT` : null, item.material_color && `${item.material_color} Gold`].filter(Boolean).join(' ')}
               </p>
             )}
             {item.size && <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>Size: {item.size}</p>}
             {(item.diamond_clarity || (item as any).diamond_color) && (
-              <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+              <p style={{ fontSize: 11, color: "#6b7280", margin: 0, textTransform: "capitalize" }}>
                 Diamond: {[item.diamond_clarity, (item as any).diamond_color].filter(Boolean).join(' ')}
               </p>
             )}
@@ -164,18 +164,18 @@ function CartItem({ item, isMobile, onQtyChange, onRemove }: CartItemProps) {
           <img src={item.product_image || product} alt="Product Image" style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", objectFit: "contain", mixBlendMode: "multiply" }} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 2px", lineHeight: 1.35 }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 2px", lineHeight: 1.35, textTransform: "capitalize" }}>
             {item.product_name}
           </p>
           {item.sku_id && <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>SKU: {item.sku_id}</p>}
           {(item.metal_name || item.material_color) && (
-            <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5, textTransform: "capitalize" }}>
               Metal: {[item.metal_name, (item as any).karat ? `${(item as any).karat}KT` : null, item.material_color && `${item.material_color} Gold`].filter(Boolean).join(' ')}
             </p>
           )}
           {item.size && <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>Size: {item.size}</p>}
           {(item.diamond_clarity || (item as any).diamond_color) && (
-            <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "#4b5563", margin: 0, lineHeight: 1.5, textTransform: "capitalize" }}>
               Diamond: {[item.diamond_clarity, (item as any).diamond_color].filter(Boolean).join(' ')}
             </p>
           )}

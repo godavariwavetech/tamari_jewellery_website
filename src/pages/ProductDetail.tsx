@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiService, type ProductDetail as ProductDetailType, type Product } from "../services/api";
 import { authService } from "../services/auth";
@@ -188,6 +188,7 @@ export default function ProductDetail() {
   };
 
   const [showPriceBreakup, setShowPriceBreakup] = useState(false);
+  const [showSizeChart, setShowSizeChart] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
   const [lensPos, setLensPos] = useState({ x: 0, y: 0 });
   const [bgPos, setBgPos] = useState({ x: 0, y: 0 });
@@ -238,6 +239,18 @@ export default function ProductDetail() {
           else if (mColor.includes("pink") || mColor.includes("rose")) setColor("Pink Gold");
           else if (mColor.includes("white")) setColor("White Gold");
         }
+
+        // Default the purity selector to the product's actual karat — otherwise the
+        // first render shows "18KT" selected even when the stored prices are for 22KT.
+        if (productData.karat) {
+          setPurity(`${productData.karat}KT`);
+        }
+
+        // Default the size selector to the first size returned from the variant_sizes
+        // table. Hardcoded "14 (54.40 mm)" is wrong for non-ring products.
+        if (productData.has_sizes === 1 && productData.sizes && productData.sizes.length > 0) {
+          setSize(productData.sizes[0].size);
+        }
       } catch (err) {
         setError('Failed to load product details');
         console.error('Error fetching product details:', err);
@@ -272,6 +285,99 @@ export default function ProductDetail() {
   };
 
   const isMobile = windowWidth < 768;
+
+  // Compute the price breakup live so it reacts to purity changes.
+  // Mirrors the backend formula in getproductdetails (mainCtrl.js):
+  //   metal_value  = gross_weight × rate_per_gram × (karat / 24)   [Gold only]
+  //   va_amount    = metal_value × VA_percentage / 100
+  //   sub_total    = metal_value + making_charges + va_amount + diamond_value + stone_value
+  //   gst_amount   = sub_total × gst_percentage / 100
+  //   total_price  = sub_total + gst_amount
+  //
+  // Karat handling — to keep the displayed numbers consistent with what the backend
+  // would compute if the product were stored at the selected karat, we:
+  //   • At the product's STORED karat → use backend's exact `metal_value` and
+  //     `makingcharges` (zero rounding drift, matches what `total_price` was built on).
+  //   • At any OTHER karat (Gold only) → recompute from `metal_rate` × `gross_weight`
+  //     scaled by `selectedKarat / productKarat`, then redo making (with VA%) and GST.
+  //     Scaling the already-rounded `metal_value` directly compounds the error and
+  //     drifts a few rupees on the total — using `metal_rate` × `gross_weight` cuts that.
+  type BreakupRow = { label: string; amount: number };
+  const breakup = useMemo<{ rows: BreakupRow[]; total: number } | null>(() => {
+    if (!product) return null;
+
+    const selectedKarat = parseInt(purity, 10) || product.karat || 0;
+    const productKarat = product.karat || selectedKarat || 0;
+    const isGold = (product.metal_name || "").toLowerCase() === "gold";
+    const sameKarat = selectedKarat === productKarat;
+
+    const grossWeight = Number(product.gross_weight || 0);
+    const ratePerGram = Number(product.rate_per_gram || 0); // raw 24K rate from backend (unrounded source)
+    const baseMetalValue = Number(product.metal_value || 0);
+
+    // metalValue: at the stored karat use backend's exact figure; otherwise compute
+    // from `rate_per_gram` (the unrounded 24K rate) — same formula the backend uses,
+    // so it matches what the backend would return if karat were the selected value.
+    let metalValue: number;
+    if (sameKarat || !isGold) {
+      metalValue = baseMetalValue;
+    } else if (ratePerGram > 0 && grossWeight > 0) {
+      // Backend formula: ROUND(gross_weight × rate_per_gram × karat / 24, 2)
+      metalValue = Number((grossWeight * ratePerGram * (selectedKarat / 24)).toFixed(2));
+    } else if (productKarat > 0) {
+      // Fallback if rate_per_gram isn't in the response: scale the rounded metal_value.
+      metalValue = baseMetalValue * (selectedKarat / productKarat);
+    } else {
+      metalValue = baseMetalValue;
+    }
+
+    // Making charge: VA scales with metal, raw making_charges does not.
+    // At the stored karat → use backend's combined `makingcharges` directly (exact).
+    // At a different karat → recompute from raw `making_charges` + `VA_percentage` when available.
+    const rawMaking = Number(product.making_charges ?? NaN);
+    const vaPercent = Number(product.VA_percentage ?? NaN);
+    let makingChargeRow: number;
+    if (sameKarat) {
+      makingChargeRow = Number(product.makingcharges || 0);
+    } else if (!Number.isNaN(rawMaking) && !Number.isNaN(vaPercent)) {
+      makingChargeRow = rawMaking + metalValue * (vaPercent / 100);
+    } else {
+      // No raw fields available — fall back to scaling the combined value, which is
+      // an approximation (over-applies VA scaling to the raw making portion). Better
+      // than showing zero, and only triggered when the API doesn't expose the raw fields.
+      makingChargeRow = Number(product.makingcharges || 0);
+    }
+
+    const diamondValue = product.has_diamond === 1 ? Number(product.diamond_value || 0) : 0;
+    const stoneValue = product.has_stone === 1 ? Number(product.stone_value || 0) : 0;
+
+    // GST: at stored karat, use backend's exact gst_amount + total_price for zero drift.
+    const subTotal = metalValue + makingChargeRow + diamondValue + stoneValue;
+    const gstPercent = Number(product.gst_percentage || 0);
+    const gstAmount = sameKarat
+      ? Number(product.gst_amount || 0)
+      : subTotal * (gstPercent / 100);
+    const total = sameKarat
+      ? Number(product.total_price ?? product.price ?? Math.round(subTotal + gstAmount))
+      : Math.round(subTotal + gstAmount);
+
+    const metalLabel = product.metal_name
+      ? `${product.metal_name}${selectedKarat ? ` ${selectedKarat}KT` : ""}${product.gross_weight ? ` (${product.gross_weight} g)` : ""}`
+      : "Metal";
+    const diamondLabel = product.diamond_weight ? `Diamond (${product.diamond_weight} ct)` : "Diamond";
+    const gstLabel = product.gst_percentage != null ? `GST (${product.gst_percentage}%)` : "GST";
+
+    // Round each line item to the nearest whole rupee — INR convention, and avoids
+    // showing fractional paise that confuse the user when comparing rows to total.
+    const rows: BreakupRow[] = [];
+    if (metalValue > 0) rows.push({ label: metalLabel, amount: Math.round(metalValue) });
+    if (diamondValue > 0) rows.push({ label: diamondLabel, amount: Math.round(diamondValue) });
+    if (stoneValue > 0) rows.push({ label: "Stone", amount: Math.round(stoneValue) });
+    rows.push({ label: "Making Charge", amount: Math.round(makingChargeRow) }); // always shown, even at 0
+    if (gstAmount > 0) rows.push({ label: gstLabel, amount: Math.round(gstAmount) });
+
+    return { rows, total };
+  }, [product, purity]);
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   if (loading) {
@@ -336,12 +442,12 @@ export default function ProductDetail() {
               <Link to="/" style={{ textDecoration: 'none', color: '#6b7280' }}>Home</Link> &nbsp;›&nbsp;
               {product?.category_name && (
                 <>
-                  <Link to={`/products?category=${product.category_id}`} style={{ textDecoration: 'none', color: '#6b7280' }}>
+                  <Link to={`/products?category=${product.category_id}`} style={{ textDecoration: 'none', color: '#6b7280', textTransform: 'capitalize' }}>
                     {product.category_name}
                   </Link> &nbsp;›&nbsp;
                 </>
               )}
-              <span style={{ color: "#111827", fontWeight: 500 }}>{product?.product_name}</span>
+              <span style={{ color: "#111827", fontWeight: 500, textTransform: "capitalize" }}>{product?.product_name}</span>
             </span>
           </nav>
 
@@ -484,7 +590,8 @@ export default function ProductDetail() {
                       borderBottom: tab === t ? `2.5px solid #111827` : "2.5px solid transparent",
                       transition: "color 0.15s",
                     }}>
-                      {t === "reviews" ? `Reviews (${reviews.length})` : t}
+                      {/* {t === "reviews" ? `Reviews (${reviews.length})` : t} */}
+                       {t === "reviews" ? `Reviews` : t}
                     </button>
                   ))}
                 </div>
@@ -494,111 +601,95 @@ export default function ProductDetail() {
                       {product?.description || "No description available for this product."}
                     </p>
                   </div>
-                ) : tab === "product detail" ? (
-                  <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.75 }}>
-                    {/* General Information */}
-                    <div style={{ marginBottom: 24 }}>
-                      <div style={{ 
-                        background: "#c9a84c", 
-                        color: "#fff", 
-                        padding: "12px 16px", 
-                        borderRadius: "8px 8px 0 0",
-                        fontWeight: 600
-                      }}>
-                        📋 General Information
+                ) : tab === "product detail" ? (() => {
+                  // Each spec row only renders when the underlying field has a real value.
+                  // Hardcoded fallbacks like "Yellow Gold" / "VVS1" / "Round" were misleading
+                  // because they looked like product data but were actually placeholders.
+                  type Row = { label: string; value: string | number | undefined | null };
+                  const renderSection = (icon: string, title: string, rows: Row[]) => {
+                    const valid = rows.filter(r => {
+                      const v = r.value;
+                      if (v === null || v === undefined) return false;
+                      const s = String(v).trim();
+                      return s.length > 0 && s !== "0";
+                    });
+                    if (valid.length === 0) return null;
+                    return (
+                      <div style={{ marginBottom: 24 }}>
+                        <div style={{
+                          background: "#c9a84c", color: "#fff", padding: "12px 16px",
+                          borderRadius: "8px 8px 0 0", fontWeight: 600,
+                          display: "flex", alignItems: "center", gap: 8,
+                        }}>
+                          {icon} {title}
+                        </div>
+                        <div style={{ border: "1px solid #e5e7eb", borderTop: "none", borderRadius: "0 0 8px 8px" }}>
+                          {valid.map((r, i) => (
+                            <div key={r.label} style={{ display: "flex", borderBottom: i === valid.length - 1 ? "none" : "1px solid #e5e7eb" }}>
+                              <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>{r.label}</div>
+                              <div style={{ padding: "12px 16px", flex: 1, textTransform: "capitalize" }}>{r.value}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div style={{ border: "1px solid #e5e7eb", borderTop: "none", borderRadius: "0 0 8px 8px" }}>
-                        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Product Code</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>{product?.sku_id || `T-MR-${String(product?.id).padStart(4, '0')}`}</div>
-                        </div>
-                        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Jewellery Type</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>{product?.category_name || "Jewellery"}</div>
-                        </div>
-                        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Number Of Products</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>1</div>
-                        </div>
-                        <div style={{ display: "flex" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Gender</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>Unisex</div>
-                        </div>
-                      </div>
-                    </div>
+                    );
+                  };
 
-                    {/* Metal Information */}
-                    <div style={{ marginBottom: 24 }}>
-                      <div style={{ 
-                        background: "#c9a84c", 
-                        color: "#fff", 
-                        padding: "12px 16px", 
-                        borderRadius: "8px 8px 0 0",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8
-                      }}>
-                        🔶 Metal Information
-                      </div>
-                      <div style={{ border: "1px solid #e5e7eb", borderTop: "none", borderRadius: "0 0 8px 8px" }}>
-                        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Metal Weight</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>{product?.gross_weight || "8.250"} g</div>
-                        </div>
-                        <div style={{ display: "flex" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Metal Colour</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>{product?.material_color || "Yellow Gold"}</div>
-                        </div>
-                      </div>
-                    </div>
+                  const generalRows: Row[] = [
+                    { label: "Product Code", value: product?.sku_id },
+                    { label: "Jewellery Type", value: product?.jewellery_type || product?.category_name },
+                    { label: "Collection", value: product?.collection },
+                    { label: "Gender", value: product?.gender },
+                    { label: "Occasion", value: product?.occasion },
+                  ];
 
-                    {/* Diamond Information */}
-                    <div style={{ marginBottom: 24 }}>
-                      <div style={{ 
-                        background: "#c9a84c", 
-                        color: "#fff", 
-                        padding: "12px 16px", 
-                        borderRadius: "8px 8px 0 0",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8
-                      }}>
-                        💎 Diamond Information
-                      </div>
-                      <div style={{ border: "1px solid #e5e7eb", borderTop: "none", borderRadius: "0 0 8px 8px" }}>
-                        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Diamond Weight</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>{product?.diamond_weight || "1.20"} ct</div>
-                        </div>
-                        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Diamond Quality</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>{product?.diamond_clarity || "VVS1"}</div>
-                        </div>
-                        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Diamond Pieces</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>1</div>
-                        </div>
-                        <div style={{ display: "flex" }}>
-                          <div style={{ padding: "12px 16px", background: "#f9fafb", width: "40%", borderRight: "1px solid #e5e7eb" }}>Diamond Shape</div>
-                          <div style={{ padding: "12px 16px", flex: 1 }}>Round</div>
-                        </div>
-                      </div>
-                    </div>
+                  const metalRows: Row[] = [
+                    { label: "Metal Type", value: product?.metal_name },
+                    { label: "Purity", value: product?.karat ? `${product.karat}KT` : undefined },
+                    { label: "Gross Weight", value: product?.gross_weight ? `${product.gross_weight} g` : undefined },
+                    { label: "Net Weight", value: product?.net_weight ? `${product.net_weight} g` : undefined },
+                    { label: "Metal Colour", value: product?.material_color },
+                  ];
 
-                    <div style={{ 
-                      background: "#fef9ec", 
-                      border: "1px solid #f59e0b", 
-                      borderRadius: 8, 
-                      padding: 16,
-                      fontSize: 13,
-                      color: "#92400e"
-                    }}>
-                      <strong>Note:</strong> It's customizable according to your requirements. Please feel free to get in touch with us for more information. Kindly mention the product code number while enquiring.
+                  const hasDiamondData = product?.has_diamond === 1;
+                  const diamondRows: Row[] = hasDiamondData ? [
+                    { label: "Diamond Weight", value: product?.diamond_weight ? `${product.diamond_weight} ct` : undefined },
+                    { label: "Diamond Pieces", value: product?.no_of_diamonds },
+                    { label: "Diamond Quality", value: product?.diamond_clarity },
+                    { label: "Diamond Colour", value: product?.diamond_color },
+                    { label: "Diamond Shape", value: product?.diamond_shape },
+                    { label: "Diamond Setting", value: product?.diamond_setting },
+                  ] : [];
+
+                  // Stone details — backend stores stone_details as JSON array of stones.
+                  // We render one combined row per stone if available.
+                  const hasStoneData = product?.has_stone === 1 && Array.isArray(product?.stone_details) && product.stone_details.length > 0;
+                  const stoneRows: Row[] = hasStoneData
+                    ? product!.stone_details!.flatMap((s, i) => {
+                        const idx = product!.stone_details!.length > 1 ? ` ${i + 1}` : "";
+                        return [
+                          { label: `Stone${idx} Name`, value: s.stone_name },
+                          { label: `Stone${idx} Weight`, value: s.stone_weight ? `${s.stone_weight} ct` : undefined },
+                        ] as Row[];
+                      })
+                    : [];
+
+                  return (
+                    <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.75 }}>
+                      {renderSection("📋", "General Information", generalRows)}
+                      {renderSection("🔶", "Metal Information", metalRows)}
+                      {renderSection("💎", "Diamond Information", diamondRows)}
+                      {renderSection("🔷", "Stone Information", stoneRows)}
+
+                      <div style={{
+                        background: "#fef9ec", border: "1px solid #f59e0b", borderRadius: 8,
+                        padding: 16, fontSize: 13, color: "#92400e",
+                      }}>
+                        <strong>Note:</strong> It's customizable according to your requirements. Please feel free to get in touch with us for more information. Kindly mention the product code number while enquiring.
+                      </div>
                     </div>
-                  </div>
-                ) : (
+                  );
+                })() : (
                   <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.75 }}>
                     {reviews.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -639,19 +730,19 @@ export default function ProductDetail() {
               )}
 
               {/* Title */}
-              <h1 style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, color: "#111827", margin: "0 0 16px", lineHeight: 1.4 }}>
+              <h1 style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, color: "#111827", margin: "0 0 16px", lineHeight: 1.4, textTransform: "capitalize" }}>
                 {product?.product_name || "Product"}
               </h1>
 
-              {/* Price — formatted per active currency (INR/USD) via CurrencyContext */}
+              {/* Price — recomputed live when purity changes (mirrors backend formula) */}
               <p style={{ fontSize: isMobile ? 26 : 32, fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>
-                {product?.price ? format(product.price, { inputIncludesGst: true }) : 'Price not available'}
+                {breakup ? format(breakup.total, { inputIncludesGst: true }) : 'Price not available'}
               </p>
               <p style={{ fontSize: 13, color: GOLD, fontWeight: 600, margin: "0 0 22px", textDecoration: "underline", cursor: "pointer" }}
                 onClick={() => setShowPriceBreakup(!showPriceBreakup)}>SEE PRICE BREAKUP</p>
 
-              {/* Price Breakup Dropdown */}
-              {showPriceBreakup && (
+              {/* Price Breakup Dropdown — driven by `breakup`, which scales with selected purity */}
+              {showPriceBreakup && breakup && (
                 <div style={{
                   background: "#fff",
                   border: "1px solid #e5e7eb",
@@ -661,30 +752,19 @@ export default function ProductDetail() {
                   boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
                 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 16px" }}>PRICE BREAKUP</h3>
-                  
+
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ color: "#6b7280" }}>Gold</span>
-                      <span style={{ fontWeight: 600 }}>Rs.{Math.round((product?.price || 0) * 0.65).toLocaleString('en-IN')}/-</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ color: "#6b7280" }}>Diamond</span>
-                      <span style={{ fontWeight: 600 }}>Rs.{Math.round((product?.price || 0) * 0.25).toLocaleString('en-IN')}/-</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ color: "#6b7280" }}>Making Charge</span>
-                      <span style={{ fontWeight: 600 }}>Rs.{Math.round((product?.price || 0) * 0.07).toLocaleString('en-IN')}/-</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ color: "#6b7280" }}>GST</span>
-                      <span style={{ fontWeight: 600 }}>Rs.{Math.round((product?.price || 0) * 0.03).toLocaleString('en-IN')}/-</span>
-                    </div>
+                    {breakup.rows.map(r => (
+                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                        <span style={{ color: "#6b7280" }}>{r.label}</span>
+                        <span style={{ fontWeight: 600 }}>{format(r.amount, { inputIncludesGst: false })}</span>
+                      </div>
+                    ))}
                     <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "12px 0" }} />
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                       <span style={{ fontWeight: 700, fontSize: 16 }}>Total</span>
-                      <span style={{ fontWeight: 700, fontSize: 16 }}>Rs.{(product?.price || 0).toLocaleString('en-IN')}/-</span>
+                      <span style={{ fontWeight: 700, fontSize: 16 }}>{format(breakup.total, { inputIncludesGst: true })}</span>
                     </div>
-                    
                   </div>
                 </div>
               )}
@@ -698,10 +778,12 @@ export default function ProductDetail() {
                   {Object.entries(COLOR_MAP).filter(([key]) => {
                     if (!product?.material_color) return key === "white"; // default if missing
                     const mColor = product.material_color.toLowerCase();
-                    if (key === "rose") return false; // don't show rose twice
-                    if (mColor.includes("yellow")) return key === "yellow";
-                    if (mColor.includes("pink") || mColor.includes("rose")) return key === "pink";
-                    if (mColor.includes("white")) return key === "white";
+                    if (key === "rose") return false; // pink + rose share a swatch; only render under "pink"
+                    // Each color is checked independently — a product with material_color
+                    // "Yellow, White" should show BOTH swatches, not just the first match.
+                    if (key === "yellow") return mColor.includes("yellow");
+                    if (key === "pink") return mColor.includes("pink") || mColor.includes("rose");
+                    if (key === "white") return mColor.includes("white");
                     return false;
                   }).map(([key, hex]) => {
                     const label = key === "yellow" ? "Yellow Gold" : key === "pink" ? "Pink Gold" : "White Gold";
@@ -739,29 +821,121 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* Size */}
-              <div style={{ marginBottom: 20 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", margin: "0 0 10px" }}>
-                  Size : &nbsp;<span style={{ fontWeight: 400 }}>{size}</span>
-                </p>
-                <div style={{ position: "relative", display: "inline-block", width: isMobile ? '100%' : 'auto' }}>
-                  <select value={size} onChange={e => setSize(e.target.value)} style={{
-                    appearance: "none", WebkitAppearance: "none",
-                    border: "1.5px solid #d1d5db", borderRadius: 8,
-                    padding: "9px 40px 9px 14px", fontSize: 14, color: "#374151",
-                    fontFamily: SF, background: "#fff", cursor: "pointer",
-                    minWidth: isMobile ? '100%' : 180,
-                  }}>
-                    {["13 (52.50 mm)", "14 (54.40 mm)", "15 (56.30 mm)", "16 (58.10 mm)", "17 (60.00 mm)"].map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
-                    <ChevDown />
-                  </span>
-                </div>
-                <p style={{ fontSize: 13, color: GOLD, margin: "8px 0 0", textDecoration: "underline", cursor: "pointer", fontWeight: 600 }}>Ring Size Guide</p>
-              </div>
+              {/* Size — only render when the product actually has size variants */}
+              {product?.has_sizes === 1 && product.sizes && product.sizes.length > 0 && (() => {
+                // Map category to an item-type label (Ring / Bangle / Bracelet / Chain / Earring).
+                // Falls back to "Size" when the category doesn't suggest a known shape.
+                const cat = (product.category_name || product.subcategory_name || "").toLowerCase();
+                const itemLabel =
+                  cat.includes("ring") ? "Ring" :
+                  cat.includes("bangle") ? "Bangle" :
+                  cat.includes("bracelet") ? "Bracelet" :
+                  cat.includes("chain") || cat.includes("necklace") ? "Chain" :
+                  cat.includes("earring") ? "Earring" :
+                  "";
+
+                return (
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", margin: "0 0 10px" }}>
+                      Size : &nbsp;<span style={{ fontWeight: 400 }}>{size}</span>
+                    </p>
+                    <div style={{ position: "relative", display: "inline-block", width: isMobile ? '100%' : 'auto' }}>
+                      <select value={size} onChange={e => setSize(e.target.value)} style={{
+                        appearance: "none", WebkitAppearance: "none",
+                        border: "1.5px solid #d1d5db", borderRadius: 8,
+                        padding: "9px 40px 9px 14px", fontSize: 14, color: "#374151",
+                        fontFamily: SF, background: "#fff", cursor: "pointer",
+                        minWidth: isMobile ? '100%' : 180,
+                      }}>
+                        {product.sizes.map(s => (
+                          <option key={s.id} value={s.size}>{s.size}</option>
+                        ))}
+                      </select>
+                      <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                        <ChevDown />
+                      </span>
+                    </div>
+                    <p
+                      onClick={() => setShowSizeChart(true)}
+                      style={{ fontSize: 13, color: GOLD, margin: "8px 0 0", textDecoration: "underline", cursor: "pointer", fontWeight: 600 }}
+                    >
+                      {itemLabel ? `${itemLabel} Size Guide` : "Size Guide"}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Size Chart Modal — lists the sizes available for this product */}
+              {showSizeChart && product?.sizes && (() => {
+                const cat = (product.category_name || product.subcategory_name || "").toLowerCase();
+                const itemLabel =
+                  cat.includes("ring") ? "Ring" :
+                  cat.includes("bangle") ? "Bangle" :
+                  cat.includes("bracelet") ? "Bracelet" :
+                  cat.includes("chain") || cat.includes("necklace") ? "Chain" :
+                  cat.includes("earring") ? "Earring" :
+                  "";
+                return (
+                  <div
+                    onClick={() => setShowSizeChart(false)}
+                    style={{
+                      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      zIndex: 1000, padding: 16,
+                    }}
+                  >
+                    <div
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        background: "#fff", borderRadius: 12, padding: 24,
+                        maxWidth: 480, width: "100%", maxHeight: "80vh", overflow: "auto",
+                        boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: "#111827", margin: 0 }}>
+                          {itemLabel ? `${itemLabel} Size Guide` : "Size Guide"}
+                        </h3>
+                        <button
+                          onClick={() => setShowSizeChart(false)}
+                          aria-label="Close"
+                          style={{
+                            background: "transparent", border: "none", fontSize: 24, lineHeight: 1,
+                            cursor: "pointer", color: "#6b7280", padding: 4,
+                          }}
+                        >×</button>
+                      </div>
+                      {product.sizechart_image ? (
+                        <img
+                          src={product.sizechart_image}
+                          alt={itemLabel ? `${itemLabel} size chart` : "Size chart"}
+                          style={{ width: "100%", height: "auto", display: "block", borderRadius: 8 }}
+                        />
+                      ) : (
+                        <>
+                          <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 16px" }}>
+                            Size chart image not available. Available sizes:
+                          </p>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                            <thead>
+                              <tr style={{ background: GOLD_L }}>
+                                <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 700, color: "#111827", borderBottom: `1px solid ${GOLD}` }}>Size</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {product.sizes.map(s => (
+                                <tr key={s.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                  <td style={{ padding: "10px 12px", color: "#374151" }}>{s.size}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* CTA buttons */}
               <div className="mobile-stack" style={{ display: "flex", gap: 12, marginBottom: 14, flexDirection: isMobile ? 'column' : 'row', alignItems: 'stretch' }}>
@@ -916,6 +1090,7 @@ export default function ProductDetail() {
                     <p style={{
                       fontSize: 13, fontWeight: 600, color: "#111827",
                       margin: "0 0 6px", lineHeight: 1.4,
+                      textTransform: "capitalize",
                       display: "-webkit-box", WebkitLineClamp: 2,
                       WebkitBoxOrient: "vertical", overflow: "hidden",
                     }}>

@@ -364,6 +364,7 @@ function SubItem({ to, children }: { to: string; children: ReactNode }) {
         textDecoration: "none",
         fontFamily: SF,
         fontSize: "13px",
+        textTransform: "capitalize",
       }}
     >
       {children}

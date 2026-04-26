@@ -56,6 +56,32 @@ export interface ProductDetail extends Product {
   diamond_clarity?: string;
   diamond_color?: string;
   category_name?: string;
+  subcategory_name?: string;
+  has_sizes?: number;
+  sizes?: Array<{ id: number; size: string }>;
+  sizechart_image?: string;
+  // Additional product attributes from z_all_products used in the Product Detail tab
+  jewellery_type?: string;
+  collection?: string;
+  occasion?: string;
+  no_of_diamonds?: number | string;
+  diamond_setting?: string;
+  diamond_shape?: string;
+  stone_details?: Array<{ stone_name?: string; stone_weight?: string | number; stone_charges?: string | number }>;
+  // Price breakup components computed by the backend (getproductdetails)
+  metal_value?: number;
+  metal_rate?: number;
+  rate_per_gram?: number;       // raw 24K per-gram rate (unrounded source for karat scaling)
+  diamond_value?: number;
+  diamond_rate_per_ct?: number;
+  stone_value?: number;
+  has_stone?: number;
+  makingcharges?: number;       // making_charges + VA amount (already combined)
+  making_charges?: number;      // raw making_charges from DB (before VA)
+  VA_percentage?: number;       // value addition %, used to recompute on purity change
+  sub_total?: number;
+  gst_percentage?: number;
+  gst_amount?: number;
 }
 
 export interface Banner {
@@ -1253,23 +1279,33 @@ export const apiService = {
       });
       
       console.log('B2B API Response status:', response.status);
-      
-      // If response is OK (200-299), consider it success
+
+      // If response is OK (200-299), inspect the inner status field — backend uses
+      // HTTP 200 for everything and signals real status in the JSON body (e.g. 409 for
+      // duplicate phone). Treat any inner status != 200 as a user-facing error.
       if (response.ok) {
         try {
           const result = await response.json();
           console.log('B2B API Success response:', result);
+          if (result && typeof result.status === 'number' && result.status !== 200) {
+            throw new Error(result.message || 'B2B form submission failed');
+          }
           return {
             success: true,
             message: 'B2B form submitted successfully. Admin acceptance is pending.',
             data: result
           };
-        } catch (parseError) {
+        } catch (parseError: any) {
+          // Re-throw thrown user-facing errors (duplicate phone etc.) instead of
+          // swallowing them as "no JSON body".
+          if (parseError instanceof Error && parseError.message && !parseError.message.startsWith('Unexpected')) {
+            throw parseError;
+          }
           // If JSON parsing fails but response is OK, still consider it success
           console.log('B2B API response is not JSON but status is OK');
-          return { 
-            success: true, 
-            message: 'B2B form submitted successfully. Admin acceptance is pending.' 
+          return {
+            success: true,
+            message: 'B2B form submitted successfully. Admin acceptance is pending.'
           };
         }
       } else {
@@ -1320,23 +1356,31 @@ export const apiService = {
       });
       
       console.log('B2C API Response status:', response.status);
-      
-      // If response is OK (200-299), consider it success
+
+      // If response is OK (200-299), inspect the inner status — backend always uses
+      // HTTP 200 and signals real status in the JSON body (e.g. 409 for duplicate phone).
       if (response.ok) {
         try {
           const result = await response.json();
           console.log('B2C API Success response:', result);
+          if (result && typeof result.status === 'number' && result.status !== 200) {
+            throw new Error(result.message || 'B2C form submission failed');
+          }
           return {
             success: true,
             message: 'B2C form submitted successfully. Admin acceptance is pending.',
             data: result
           };
-        } catch (parseError) {
-          // If JSON parsing fails but response is OK, still consider it success
+        } catch (parseError: any) {
+          // Re-throw thrown user-facing errors (duplicate phone etc.) so the form
+          // can display them — only swallow genuine "body wasn't JSON" errors.
+          if (parseError instanceof Error && parseError.message && !parseError.message.startsWith('Unexpected')) {
+            throw parseError;
+          }
           console.log('B2C API response is not JSON but status is OK');
-          return { 
-            success: true, 
-            message: 'B2C form submitted successfully. Admin acceptance is pending.' 
+          return {
+            success: true,
+            message: 'B2C form submitted successfully. Admin acceptance is pending.'
           };
         }
       } else {

@@ -6,6 +6,9 @@ const textDark = "#222";
 const textMid = "#444";
 const borderGold = "#e0c070";
 
+const QUESTION_FONT = "'Times New Roman', Times, serif";
+const ANSWER_FONT = "-apple-system,'SF Pro Display','SF Pro Text',BlinkMacSystemFont,sans-serif";
+
 const chevronDown = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={goldColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9" />
@@ -50,7 +53,7 @@ function AccordionSection({ title, children, defaultOpen = false }: { title: str
           textAlign: 'left',
         }}
       >
-        <span style={{ fontSize: 24, fontWeight: 700, color: goldColor, letterSpacing: 0.2 }}>{title}</span>
+        <span style={{ fontSize: 24, fontWeight: 700, color: goldColor, letterSpacing: 0.2, fontFamily: QUESTION_FONT }}>{title}</span>
         {open ? chevronUp : chevronDown}
       </button>
       {open && (
@@ -66,7 +69,7 @@ function CheckItem({ children, color = goldColor }: { children: React.ReactNode;
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 7 }}>
       {checkIcon(color)}
-      <span style={{ fontSize: 18, color: textMid, lineHeight: 1.6 }}>{children}</span>
+      <span style={{ fontSize: 18, color: textMid, lineHeight: 1.6, fontFamily: ANSWER_FONT }}>{children}</span>
     </div>
   );
 }
@@ -75,7 +78,7 @@ function BulletItem({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 6 }}>
       {bulletDot}
-      <span style={{ fontSize: 18, color: textMid, lineHeight: 1.6 }}>{children}</span>
+      <span style={{ fontSize: 18, color: textMid, lineHeight: 1.6, fontFamily: ANSWER_FONT }}>{children}</span>
     </div>
   );
 }
@@ -125,7 +128,7 @@ export default function CertificationGuide() {
             lineHeight: 1.75,
             margin: '0 auto',
             maxWidth: 2400,
-            fontFamily: 'sans-serif',
+            fontFamily: QUESTION_FONT,
           }}>
             When buying jewellery, honesty alone is not enough — <em style={{ color: goldColor }}>authenticity, purity</em>, and <em style={{ color: goldColor }}>trust</em> matter just as much.
             Jewellery certification is your guarantee that what you are buying is genuine, accurately graded, and fairly priced.
@@ -134,7 +137,7 @@ export default function CertificationGuide() {
             marginTop: 18,
             fontSize: 18,
             color: textMid,
-            fontFamily: 'sans-serif',
+            fontFamily: QUESTION_FONT,
             lineHeight: 1.65,
           }}>
             At <strong style={{ color: goldColor }}>TAMIRI JEWELLERS PVT LTD</strong>, we believe an informed customer is a confident customer. This <span style={{ color: goldColor, textDecoration: 'underline', cursor: 'pointer' }}>Certification Guide</span> explains everything you need to know about gold, diamond, and gemstone certifications so you can shop with complete peace of mind.
@@ -147,7 +150,7 @@ export default function CertificationGuide() {
 
         {/* 1. What is Jewellery Certification */}
         <AccordionSection title="What Is Jewellery Certification?" defaultOpen={true}>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, marginTop: 16, fontFamily: 'sans-serif' }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, marginTop: 16, fontFamily: ANSWER_FONT }}>
             Jewellery certification is an official verification issued by authorised institutions that confirms:
           </p>
           <div style={{ marginTop: 8 }}>
@@ -156,11 +159,11 @@ export default function CertificationGuide() {
             <BulletItem>Quality grading</BulletItem>
             <BulletItem>Weight and specifications</BulletItem>
           </div>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, marginTop: 14, fontFamily: 'sans-serif' }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, marginTop: 14, fontFamily: ANSWER_FONT }}>
             A certificate protects you from adulteration, overpricing, and misinformation.
           </p>
           <div style={{ marginTop: 18, padding: '14px 18px', background: goldBg, borderRadius: 10, border: `1px solid ${borderGold}` }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 18, color: textMid }}>
+            <span style={{ fontFamily: ANSWER_FONT, fontSize: 18, color: textMid }}>
               At <strong style={{ color: goldColor }}>TAMIRI JEWELLERS</strong> every certified piece reflects our commitment to honesty and excellence.
             </span>
           </div>
@@ -176,7 +179,7 @@ export default function CertificationGuide() {
             <CheckItem>Acts as legal proof of quality.</CheckItem>
           </div>
           <div style={{ marginTop: 16, padding: '14px 18px', background: goldBg, borderRadius: 10, border: `1px solid ${borderGold}` }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 18, color: textMid }}>
+            <span style={{ fontFamily: ANSWER_FONT, fontSize: 18, color: textMid }}>
               At <strong style={{ color: goldColor }}>TAMIRI JEWELLERS</strong> every certified piece reflects our commitment to honesty and excellence.
             </span>
           </div>
@@ -185,15 +188,15 @@ export default function CertificationGuide() {
         {/* 3. Gold Certification & Hallmarking */}
         <AccordionSection title="Gold Certification & Hallmarking." defaultOpen={false}>
           <SectionTitle>What Is Gold Hallmarking?</SectionTitle>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', margin: '0 0 10px' }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, margin: '0 0 10px' }}>
             Gold hallmarking confirms the purity of gold jewellery and is regulated in India by the <span style={{ color: goldColor }}>Bureau of Indian Standards (BIS)</span>.
           </p>
 
           <SectionTitle>BIS Hallmark Components.</SectionTitle>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', margin: '0 0 12px' }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, margin: '0 0 12px' }}>
             Hallmark Unique Identification (HUID) is a mandatory, unique 6-digit alphanumeric code laser-inscribed on each piece of hallmarked gold jewellery in India, serving as a digital fingerprint for traceability and authenticity, part of the Bureau of Indian Standards (BIS) system that also includes the BIS logo and purity symbol. Customers can verify a piece's origin and purity by entering the HUID in the <span style={{ color: goldColor }}>BIS CARE App</span>.
           </p>
-          <div style={{ fontFamily: 'sans-serif' }}>
+          <div style={{ fontFamily: ANSWER_FONT }}>
             {[
               ['BIS Logo', 'Indicates government authorised certification with HUD CODE on the article.'],
               ['Purity Mark', 'Example: 22K (916), 18K (750), 14K (585)'],
@@ -218,12 +221,12 @@ export default function CertificationGuide() {
             ].map(([k, v]) => (
               <div key={k} style={{ padding: '12px 14px', background: goldBg, borderRadius: 10, border: `1px solid ${borderGold}` }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: goldColor, marginBottom: 4 }}>{k}</div>
-                <div style={{ fontSize: 17, color: textMid, fontFamily: 'sans-serif' }}>{v}</div>
+                <div style={{ fontSize: 17, color: textMid, fontFamily: ANSWER_FONT }}>{v}</div>
               </div>
             ))}
           </div>
           <div style={{ marginTop: 16, padding: '14px 18px', background: goldBg, borderRadius: 10, border: `1px solid ${borderGold}` }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 17.5, color: textMid }}>
+            <span style={{ fontFamily: ANSWER_FONT, fontSize: 17.5, color: textMid }}>
               <strong style={{ color: goldColor }}>TAMIRI JEWELLERS PROMISE:</strong> All our gold jewellery is BIS Hallmarked for guaranteed purity.
             </span>
           </div>
@@ -231,7 +234,7 @@ export default function CertificationGuide() {
 
         {/* 4. Diamond Certification */}
         <AccordionSection title="Diamond Certification – What You Should Know." defaultOpen={false}>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginTop: 16 }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, marginTop: 16 }}>
             Diamond certification confirms that a diamond is genuine and professionally graded.
           </p>
           <SectionTitle>What a Diamond Certificate Includes</SectionTitle>
@@ -240,11 +243,11 @@ export default function CertificationGuide() {
               <BulletItem key={t}>{t}</BulletItem>
             ))}
           </div>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginTop: 10 }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, marginTop: 10 }}>
             This information is based on the globally accepted <strong>4 C's of Diamonds</strong>.
           </p>
           <SectionTitle>Trusted Diamond Certification Laboratories</SectionTitle>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginBottom: 8 }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, marginBottom: 8 }}>
             At <strong style={{ color: goldColor }}>TAMIRI JEWELLERS PVT LTD</strong>, we provide diamonds certified by reputed international and national laboratories such as:
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 15, marginTop: 10 }}>
@@ -255,7 +258,7 @@ export default function CertificationGuide() {
             ].map(([k, v]) => (
               <div key={k} style={{ padding: '16px 20px', background: goldBg, borderRadius: 10, border: `1px solid ${borderGold}` }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: goldColor, marginBottom: 5 }}>{k}</div>
-                <div style={{ fontSize: 17, color: textMid, fontFamily: 'sans-serif', lineHeight: 1.5 }}>{v}</div>
+                <div style={{ fontSize: 17, color: textMid, fontFamily: ANSWER_FONT, lineHeight: 1.5 }}>{v}</div>
               </div>
             ))}
           </div>
@@ -263,7 +266,7 @@ export default function CertificationGuide() {
 
         {/* 5. Solitaire Certification */}
         <AccordionSection title="Solitaire Certification." defaultOpen={false}>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginTop: 16 }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, marginTop: 16 }}>
             A solitaire is a single, significant diamond or gemstone set in jewellery. Due to its value, certification is even more critical.
           </p>
           <SectionTitle>Key Features of Solitaire Certification</SectionTitle>
@@ -273,7 +276,7 @@ export default function CertificationGuide() {
             <BulletItem>Plotting Diagram — A map showing the internal and external characteristics of the stone.</BulletItem>
           </div>
           <div style={{ marginTop: 18, padding: '14px 18px', background: goldBg, borderRadius: 10, border: `1px solid ${borderGold}` }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 18, color: textMid }}>
+            <span style={{ fontFamily: ANSWER_FONT, fontSize: 18, color: textMid }}>
               Every solitaire from <strong style={{ color: goldColor }}>TAMIRI JEWELLERS</strong> comes with a full grading report from a leading laboratory.
             </span>
           </div>
@@ -281,7 +284,7 @@ export default function CertificationGuide() {
 
         {/* 6. Certification for Resale & Exchange */}
         <AccordionSection title="Certification for Resale & Exchange." defaultOpen={false}>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginTop: 16 }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, marginTop: 16 }}>
             Having a valid certificate makes the process of reselling or exchanging jewellery transparent and hassle-free.
           </p>
           <SectionTitle>How Certification Helps</SectionTitle>
@@ -291,7 +294,7 @@ export default function CertificationGuide() {
             <BulletItem>Global Recognition — Internationally certified stones can be valued and traded worldwide.</BulletItem>
           </div>
           <div style={{ marginTop: 18, padding: '14px 18px', background: goldBg, borderRadius: 10, border: `1px solid ${borderGold}` }}>
-            <span style={{ fontFamily: 'sans-serif', fontSize: 18, color: textMid }}>
+            <span style={{ fontFamily: ANSWER_FONT, fontSize: 18, color: textMid }}>
               Always keep your certificates and original invoices safely for future transactions.
             </span>
           </div>
@@ -299,7 +302,7 @@ export default function CertificationGuide() {
 
         {/* 7. Summary & Trust Promise */}
         <AccordionSection title="The TAMIRI Trust Promise." defaultOpen={false}>
-          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginTop: 16 }}>
+          <p style={{ fontSize: 18, color: textMid, lineHeight: 1.75, fontFamily: ANSWER_FONT, marginTop: 16 }}>
             At <strong style={{ color: goldColor }}>TAMIRI JEWELLERS PVT LTD</strong>, certification is not just a document; it is our promise of purity, truth, and transparency.
           </p>
           <SectionTitle>Our Commitment to You</SectionTitle>
@@ -318,12 +321,12 @@ export default function CertificationGuide() {
       </div>
 
       {/* Final Summary Section from Image */}
-      <div style={{ 
-        maxWidth: 1200, 
-        margin: '60px auto 0', 
-        padding: '0 20px 80px', 
+      <div style={{
+        maxWidth: 1200,
+        margin: '60px auto 0',
+        padding: '0 20px 80px',
         textAlign: 'center',
-        fontFamily: 'sans-serif'
+        fontFamily: QUESTION_FONT
       }}>
         <h2 style={{ 
           fontSize: 24, 

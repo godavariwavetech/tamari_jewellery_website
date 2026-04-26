@@ -280,7 +280,7 @@ function OrdersTab({ isMobile, orders }: { isMobile: boolean; orders: Order[] })
                 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{o.order_id}</div>
                   <div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#111827", margin: "0 0 4px" }}>{o.items?.[0]?.product_name || 'Multiple Items'}</p>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#111827", margin: "0 0 4px", textTransform: "capitalize" }}>{o.items?.[0]?.product_name || 'Multiple Items'}</p>
                     <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Items: {o.items?.length || 0}</p>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{format(o.total_amount || 0, { inputIncludesGst: true })}</div>
@@ -315,7 +315,7 @@ function OrdersTab({ isMobile, orders }: { isMobile: boolean; orders: Order[] })
                       borderRadius: 20,
                     }}>{o.order_status}</span>
                   </div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", margin: "0 0 4px" }}>{o.items?.[0]?.product_name || 'Multiple Items'}</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", margin: "0 0 4px", textTransform: "capitalize" }}>{o.items?.[0]?.product_name || 'Multiple Items'}</p>
                   <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Items: {o.items?.length || 0}</p>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>

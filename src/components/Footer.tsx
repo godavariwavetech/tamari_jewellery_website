@@ -325,13 +325,13 @@ export default function TamiriFooter() {
             </div>
 
             {/* Payment Icons */}
-            <div style={{marginTop:"130px"}}>
-              <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", marginBottom: "px" }}>
+            <div style={{marginTop:"130px", display:"flex", justifyContent:"space-between", flexDirection:"column"}}>
+              <div style={{ display: "flex", gap: "15px", justifyContent: "center", alignItems: "center", marginBottom: "px" }}>
                 <VisaIcon />
                 <MastercardIcon />
                 <RupayIcon />
               </div>
-              <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "15px", justifyContent: "center", alignItems: "center" }}>
                 <MaestroIcon />
                 <AmexIcon />
                 <UpiIcon />

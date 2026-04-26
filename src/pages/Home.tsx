@@ -482,6 +482,7 @@ function TrendingStyles({ w }: { w: number }) {
                 margin: "0 0 6px",
                 lineHeight: 1.3,
                 paddingRight: isMobile ? 36 : 44, // space for + button
+                textTransform: "capitalize",
                 display: "-webkit-box",
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: "vertical",

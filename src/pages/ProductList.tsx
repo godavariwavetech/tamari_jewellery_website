@@ -97,7 +97,7 @@ function CheckRow({ label, checked, count, onClick }: { label: string; checked: 
             </svg>
           )}
         </div>
-        <span style={{ fontFamily: SF, fontSize: 13, color: "#374151" }}>{label}</span>
+        <span style={{ fontFamily: SF, fontSize: 13, color: "#374151", textTransform: "capitalize" }}>{label}</span>
       </div>
       {count != null && <span style={{ fontFamily: SF, fontSize: 12, fontWeight: 600, color: "#111827" }}>({count})</span>}
     </label>
@@ -119,11 +119,12 @@ function Sidebar({
   const [priceRangeOpen, setPriceRangeOpen] = useState(true);
   const [sortByOpen, setSortByOpen] = useState(true);
 
-  // Slider bounds derived from the actual product catalog
+  // Slider bounds derived from the actual product catalog.
+  // Min always starts at 0 — even when every product happens to be ≥ ₹500, anchoring
+  // the slider at 0 lets users see the full range and keeps "price on request" items
+  // (price = 0) inside the visible range rather than below it.
   const pricedProducts = allProducts.filter(p => (p.price || 0) > 0);
-  const minPriceLimit = pricedProducts.length > 0
-    ? Math.floor(Math.min(...pricedProducts.map(p => p.price)))
-    : 0;
+  const minPriceLimit = 0;
   const maxPrice = pricedProducts.length > 0
     ? Math.ceil(Math.max(...pricedProducts.map(p => p.price), minPriceLimit + 100000))
     : 100000;
@@ -212,6 +213,11 @@ function Sidebar({
     });
   };
   const matchesPrice = (p: Product) => {
+    // Products with price = 0 are "price on request" items — they're excluded from
+    // the catalog min/max calculation, so applying the slider bounds to them would
+    // always drop them (0 < catalogMin). Treat unpriced products as outside the
+    // price filter rather than below it, so they remain visible.
+    if (!p.price || p.price <= 0) return true;
     if (filters.minPrice > 0 && p.price < filters.minPrice) return false;
     if (filters.maxPrice > 0 && p.price > filters.maxPrice) return false;
     return true;
@@ -802,6 +808,7 @@ function ProductCard({ product }: { product: Product }) {
           fontSize: 15, fontWeight: 700, color: "#111827",
           margin: "0 0 10px", lineHeight: 1.35,
           textAlign: "left",
+          textTransform: "capitalize",
           display: "-webkit-box", WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical", overflow: "hidden",
         }}>
@@ -928,17 +935,16 @@ export default function ProductList() {
     fetchData();
   }, [categoryParam, genderParam]);
 
-  // Once products load, align min/max price filters to the catalog's actual range
-  // (only if the user hasn't touched them yet — detected by checking they're still at the initial 0)
+  // Once products load, align the max price filter to the catalog's actual ceiling.
+  // Min stays at 0 so the slider's left edge always represents "no lower bound" —
+  // this keeps zero-price ("price on request") products inside the active range.
   useEffect(() => {
     if (allProducts.length === 0) return;
     const priced = allProducts.filter(p => (p.price || 0) > 0);
     if (priced.length === 0) return;
-    const catalogMin = Math.floor(Math.min(...priced.map(p => p.price)));
-    const catalogMax = Math.ceil(Math.max(...priced.map(p => p.price), catalogMin + 100000));
+    const catalogMax = Math.ceil(Math.max(...priced.map(p => p.price), 100000));
     setFilters(prev => ({
       ...prev,
-      minPrice: prev.minPrice === 0 ? catalogMin : prev.minPrice,
       maxPrice: prev.maxPrice === 0 ? catalogMax : prev.maxPrice,
     }));
   }, [allProducts]);
@@ -997,8 +1003,11 @@ export default function ProductList() {
         });
       }
       
-      // Apply price range filter — 0 on either bound means "not set yet (initial state)"
+      // Apply price range filter — 0 on either bound means "not set yet (initial state)".
+      // Keep "price on request" products (price <= 0) visible regardless of the slider —
+      // they're not in any price bucket, so excluding them via min/max is wrong.
       filtered = filtered.filter(p => {
+        if (!p.price || p.price <= 0) return true;
         if (filters.minPrice > 0 && p.price < filters.minPrice) return false;
         if (filters.maxPrice > 0 && p.price > filters.maxPrice) return false;
         return true;
@@ -1157,6 +1166,7 @@ export default function ProductList() {
             <h1 style={{
               fontFamily: SF, fontSize: 26, fontWeight: 700,
               color: "#111827", margin: "0 0 12px", letterSpacing: -0.3,
+              textTransform: "capitalize",
             }}>
               {getPageTitle()}
             </h1>
