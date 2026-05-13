@@ -6,13 +6,45 @@ interface ContactUsPopupProps {
 }
 
 const ContactUsPopup: React.FC<ContactUsPopupProps> = ({ isOpen, onClose }) => {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
 
   if (!isOpen) return null;
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^[A-Za-z ]*$/.test(value)) {
+      setName(value);
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^\d*$/.test(value)) {
+      setPhone(value);
+    }
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^[a-zA-Z0-9@._%+-]*$/.test(value)) {
+      setEmail(value);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSuccess(true);
+    
+    // Clear controlled inputs
+    setName("");
+    setEmail("");
+    setPhone("");
+    
+    // Clear uncontrolled inputs (select, textarea)
+    (e.target as HTMLFormElement).reset();
   };
 
   const handleClose = () => {
@@ -51,9 +83,18 @@ const ContactUsPopup: React.FC<ContactUsPopupProps> = ({ isOpen, onClose }) => {
           padding: '20px',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           borderBottom: '1px solid #eee',
         }}>
-          <button 
+          <div style={{ width: '36px' }}></div>
+          <h2 style={{
+            textAlign: 'center',
+            fontSize: '24px',
+            fontWeight: 'bold',
+            fontFamily: "Georgia, serif",
+            margin: 0,
+          }}>Contact Us</h2>
+          <button
             onClick={handleClose}
             style={{
               background: 'none',
@@ -65,26 +106,19 @@ const ContactUsPopup: React.FC<ContactUsPopupProps> = ({ isOpen, onClose }) => {
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
-          <h2 style={{
-            flex: 1,
-            textAlign: 'center',
-            fontSize: '24px',
-            fontWeight: 'bold',
-            fontFamily: "Georgia, serif",
-            margin: 0,
-            marginRight: '36px'
-          }}>Contact Us</h2>
         </div>
 
         {/* Content */}
-        <div style={{
+        <div className="hide-scrollbar" style={{
           padding: '24px',
           overflowY: 'auto',
           flex: 1,
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}>
           {!isSuccess ? (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -92,22 +126,25 @@ const ContactUsPopup: React.FC<ContactUsPopupProps> = ({ isOpen, onClose }) => {
                 <label style={{ fontSize: '14px', fontWeight: 600, color: '#4b5563', marginBottom: '6px', display: 'block' }}>
                   Name <span style={{ color: 'red' }}>*</span>
                 </label>
-                <input required type="text" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none' }} />
+                <input required type="text" value={name} onChange={handleNameChange} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none' }} />
+                {name && name.trim().length === 0 && <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>Name cannot be empty</span>}
               </div>
 
               <div>
                 <label style={{ fontSize: '14px', fontWeight: 600, color: '#4b5563', marginBottom: '6px', display: 'block' }}>
                   Email
                 </label>
-                <input type="email" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none' }} />
+                <input type="email" value={email} onChange={handleEmailChange} pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none' }} />
+                {email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email) && <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>Please enter a valid email address</span>}
               </div>
 
               <div>
                 <label style={{ fontSize: '14px', fontWeight: 600, color: '#4b5563', marginBottom: '2px', display: 'block' }}>
                   Mobile Number <span style={{ color: 'red' }}>*</span>
                 </label>
-                <span style={{ fontSize: '11px', color: '#ef4444', marginBottom: '6px', display: 'block' }}>enter a phone number linked with WhatsApp.</span>
-                <input required type="tel" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none' }} />
+                <span style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', display: 'block' }}>enter a phone number linked with WhatsApp.</span>
+                <input required type="tel" value={phone} onChange={handlePhoneChange} minLength={10} maxLength={15} pattern="\d{10,15}" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none' }} />
+                {phone && phone.length < 10 && <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>Mobile number must be at least 10 digits</span>}
               </div>
 
               <div>
@@ -129,7 +166,7 @@ const ContactUsPopup: React.FC<ContactUsPopupProps> = ({ isOpen, onClose }) => {
                 <textarea required style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none', minHeight: '120px', resize: 'vertical' }}></textarea>
               </div>
 
-              <button 
+              <button
                 type="submit"
                 style={{
                   backgroundColor: '#e6a817',
@@ -176,7 +213,7 @@ const ContactUsPopup: React.FC<ContactUsPopupProps> = ({ isOpen, onClose }) => {
                 Your enquiry has been sent successfully.<br />
                 We will get back to you soon.
               </p>
-              <button 
+              <button
                 onClick={handleClose}
                 style={{
                   marginTop: '32px',

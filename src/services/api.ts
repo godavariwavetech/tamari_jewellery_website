@@ -50,7 +50,6 @@ export interface ProductDetail extends Product {
   related_products?: Product[];
   sku_id?: string;
   gross_weight?: string;
-  net_weight?: string;
   karat?: number;
   material_color?: string;
   metal_name?: string;
@@ -70,20 +69,25 @@ export interface ProductDetail extends Product {
   diamond_setting?: string;
   diamond_shape?: string;
   stone_details?: Array<{ stone_name?: string; stone_weight?: string | number; stone_charges?: string | number }>;
-  // Price breakup components computed by the backend (getproductdetails)
-  metal_value?: number;
+  // Weights (from z_all_products)
+  net_weight?: number;          // pure metal weight (admin-entered, already net of stones)
+  // Price breakup components computed by backend (utils/priceCalculator.js, PDF formula)
+  metal_value?: number;         // gold value at stored karat
   metal_rate?: number;
-  rate_per_gram?: number;       // raw 24K per-gram rate (unrounded source for karat scaling)
+  rate_per_gram?: number;       // 24K base rate from metal_daily_rates
   diamond_value?: number;
   diamond_rate_per_ct?: number;
   stone_value?: number;
   has_stone?: number;
-  makingcharges?: number;       // making_charges + VA amount (already combined)
-  making_charges?: number;      // raw making_charges from DB (before VA)
-  VA_percentage?: number;       // value addition %, used to recompute on purity change
+  certificate_value?: number;   // diamond_ct × ₹850 (per PDF "Other" row)
+  making_value?: number;        // net × (1+VA/100) × making_charges_per_gram
+  makingcharges?: number;       // legacy alias for making_value (kept for backward compat)
+  making_charges?: number;      // raw per-gram making rate (₹/gram, NOT total ₹)
+  VA_percentage?: number;       // wastage % — used in PDF gold weight + making formulas
   sub_total?: number;
   gst_percentage?: number;
   gst_amount?: number;
+  price_breakdown?: Array<{ label: string; amount: number }>; // pre-built rows for UI
 }
 
 export interface Banner {

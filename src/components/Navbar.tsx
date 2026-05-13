@@ -610,6 +610,7 @@ export default function TamiriNavbar() {
             alignItems: "center",
             justifyContent: "center",
             background: `url(${headerBg}) no-repeat center center`,
+            backgroundSize: "cover",
             height: "56px",
             width: "100%",
             zIndex: 1000,

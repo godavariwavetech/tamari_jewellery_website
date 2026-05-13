@@ -178,7 +178,7 @@ const OTPVerification = () => {
               borderRadius: '8px',
               fontSize: '18px',
               fontWeight: 600,
-              cursor: loading || otp.join('').length !== 6 ? 'not-allowed' : 'pointer',
+              cursor: loading || otp.join('').length !== 4 ? 'not-allowed' : 'pointer',
               marginBottom: '20px'
             }}
           >

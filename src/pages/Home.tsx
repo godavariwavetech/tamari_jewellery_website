@@ -169,7 +169,7 @@ function ShopByCategory({ w }: { w: number }) {
       <div style={{
         position: "relative",
         width: "100%",
-        maxWidth: 1400,
+        maxWidth: 1800,
         margin: "0 auto",
         paddingLeft: sectionPadX,
         paddingRight: sectionPadX,
@@ -366,7 +366,7 @@ function TrendingStyles({ w }: { w: number }) {
         style={{
           position: "relative",
           width: "100%",
-          maxWidth: 1400,
+          maxWidth: 1800,
           margin: "0 auto",
           paddingLeft: isDesktop ? 48 : isTablet ? 32 : 16,
           paddingRight: isDesktop ? 48 : isTablet ? 32 : 16,
@@ -634,7 +634,7 @@ function CraftedSection({ w }: { w: number }) {
       <div
         style={{
           width: "100%",
-          maxWidth: 1200,
+          maxWidth: 1600,
           height: isDesktop ? 650 : isTablet ? 550 : "auto",
           position: "relative",
           zIndex: 1,
@@ -647,6 +647,7 @@ function CraftedSection({ w }: { w: number }) {
       >
         {/* ================= HIM ================= */}
         <div
+          className="crafted-card"
           onClick={() => goToGender("Men")}
           role="button"
           tabIndex={0}
@@ -711,6 +712,7 @@ function CraftedSection({ w }: { w: number }) {
 
         {/* ================= HER ================= */}
         <div
+          className="crafted-card"
           onClick={() => goToGender("Women")}
           role="button"
           tabIndex={0}
@@ -898,7 +900,7 @@ function MediaPresence({ w }: { w: number }) {
         gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
         gap: isDesktop ? 24 : isTablet ? 20 : 20,
         padding: `24px ${isDesktop ? 48 : isTablet ? 32 : 16}px`,
-        maxWidth: 1400,
+        maxWidth: 1800,
         margin: "0 auto",
       }}>
         {videos.slice(0, isDesktop ? 4 : isTablet ? 4 : 3).map((m) => {
@@ -1149,7 +1151,7 @@ function Testimonials({ w }: { w: number }) {
       <div style={{
         position: "relative",
         zIndex: 1,
-        maxWidth: 1400,
+        maxWidth: 1800,
         margin: "0 auto",
         paddingLeft: isDesktop ? 48 : isTablet ? 32 : 16,
         paddingRight: isDesktop ? 48 : isTablet ? 32 : 16,
@@ -1240,6 +1242,19 @@ export default function TamiriHomePage() {
         ::-webkit-scrollbar { display: none; }
         button { outline: none; }
         body { margin: 0; padding: 0; }
+        
+        .crafted-card {
+          transition: transform 0.3s ease;
+        }
+        .crafted-card:hover {
+          transform: translateY(-8px);
+        }
+        .crafted-card img {
+          transition: transform 0.4s ease;
+        }
+        .crafted-card:hover img {
+          transform: scale(1.02);
+        }
       `}</style>
       <div style={{
         width: "100%", background: "#fff",

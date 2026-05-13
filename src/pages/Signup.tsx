@@ -1,8 +1,75 @@
-import { useState, useLayoutEffect } from 'react';
+import { useState, useLayoutEffect, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoImg from '../assets/logo-removebg.png';
 import backgroundImg from '../assets/login-background.jpg';
 import { apiService } from '../services/api';
+
+const ValidatedInput = ({ name, type = 'text', style, pattern, placeholder, title, maxLength, minLength, required, onChange, onBlur, value: propValue }: any) => {
+  const [error, setError] = useState('');
+  const [internalValue, setInternalValue] = useState(propValue || '');
+
+  useEffect(() => {
+    if (propValue !== undefined) {
+      setInternalValue(propValue);
+    }
+  }, [propValue]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    if ((name === 'surname' || name === 'full_name' || name === 'legal_buss_name' || name.includes('_name'))) {
+      val = val.replace(/[^a-zA-Z\s]/g, '');
+    } else if (name === 'phn_number' || name === 'phn_numb' || name === 'whatsapp_num' || name.includes('_mobile') || name === 'aadhar_num' || name === 'pincode') {
+      val = val.replace(/[^0-9]/g, '');
+    } else if (name === 'pan_num' || name === 'pan_number' || name === 'gstin') {
+      val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+    
+    setInternalValue(val);
+    e.target.value = val;
+    if (onChange) onChange(e);
+
+    if (error && e.target.validity.valid) {
+      setError('');
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (!internalValue && required) {
+      setError('This field is required');
+    } else if (e.target.validity.patternMismatch) {
+      setError(title || 'Invalid format');
+    } else if (e.target.validity.typeMismatch && type === 'email') {
+      setError('Please enter a valid email address');
+    } else if ((name === 'phn_number' || name === 'phn_numb' || name === 'whatsapp_num' || name.includes('_mobile')) && internalValue.length > 0 && internalValue.length < 10) {
+      setError('Mobile number must be 10 digits');
+    } else if (name === 'aadhar_num' && internalValue.length > 0 && internalValue.length < 12) {
+      setError('Aadhar number must be 12 digits');
+    } else {
+      setError('');
+    }
+    if (onBlur) onBlur(e);
+  };
+
+  return (
+    <>
+      <input
+        type={type}
+        name={name}
+        style={{ ...style, borderColor: error ? '#ef4444' : style?.borderColor }}
+        pattern={pattern}
+        placeholder={placeholder}
+        title={title}
+        maxLength={maxLength}
+        minLength={minLength}
+        required={required}
+        value={internalValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+      />
+      {error && <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{error}</span>}
+    </>
+  );
+};
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -825,17 +892,17 @@ const renderBusinessForm = () => (
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>Surname <span style={{ color: 'red' }}>*</span></label>
-      <input type="text" name="surname" style={inputStyle} required />
+      <ValidatedInput type="text" name="surname" style={inputStyle} required />
     </div>
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>Full Name <span style={{ color: 'red' }}>*</span></label>
-      <input type="text" name="full_name" style={inputStyle} required />
+      <ValidatedInput type="text" name="full_name" style={inputStyle} required />
     </div>
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>Email ID (optional)</label>
-      <input 
+      <ValidatedInput 
         type="email" 
         name="email"
         style={inputStyle}
@@ -848,7 +915,7 @@ const renderBusinessForm = () => (
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>Mobile Number <span style={{ color: 'red' }}>*</span></label>
       <span style={{ display: 'block', fontSize: '12px', color: '#F45151', marginBottom: '5px' }}>enter a phone number linked with WhatsApp.</span>
-      <input 
+      <ValidatedInput 
         type="tel" 
         name="phn_number"
         style={inputStyle}
@@ -862,7 +929,7 @@ const renderBusinessForm = () => (
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>Aadhar Number <span style={{ color: 'red' }}>*</span></label>
-      <input 
+      <ValidatedInput 
         type="text" 
         name="aadhar_num"
         style={inputStyle}
@@ -905,7 +972,7 @@ const renderBusinessForm = () => (
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>PAN Number</label>
-      <input 
+      <ValidatedInput 
         type="text" 
         name="pan_number"
         style={inputStyle}
@@ -913,9 +980,6 @@ const renderBusinessForm = () => (
         placeholder="ABCDE1234F"
         title="Please enter a valid PAN number (e.g., ABCDE1234F)"
         maxLength={10}
-        onChange={(e) => {
-          e.target.value = e.target.value.toUpperCase();
-        }}
       />
     </div>
 
@@ -959,36 +1023,36 @@ const renderBusinessForm = () => (
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>Building/Flat No</label>
-      <input type="text" name="building_no" style={inputStyle} />
+      <ValidatedInput type="text" name="building_no" style={inputStyle} />
     </div>
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>Street</label>
-      <input type="text" name="street" style={inputStyle} />
+      <ValidatedInput type="text" name="street" style={inputStyle} />
     </div>
 
     <div style={{ display: 'grid', gridTemplateColumns: stackForms ? '1fr' : '1fr 1fr', gap: '14px' }}>
       <div style={fieldWrapStyle}>
         <label style={labelStyle}>Locality</label>
-        <input type="text" name="locality" style={inputStyle} />
+        <ValidatedInput type="text" name="locality" style={inputStyle} />
       </div>
       <div style={fieldWrapStyle}>
         <label style={labelStyle}>City</label>
-        <input type="text" name="city" style={inputStyle} />
+        <ValidatedInput type="text" name="city" style={inputStyle} />
       </div>
       <div style={fieldWrapStyle}>
         <label style={labelStyle}>District</label>
-        <input type="text" name="district" style={inputStyle} />
+        <ValidatedInput type="text" name="district" style={inputStyle} />
       </div>
       <div style={fieldWrapStyle}>
         <label style={labelStyle}>State</label>
-        <input type="text" name="state" style={inputStyle} />
+        <ValidatedInput type="text" name="state" style={inputStyle} />
       </div>
     </div>
 
     <div style={fieldWrapStyle}>
       <label style={labelStyle}>PIN Code</label>
-      <input 
+      <ValidatedInput 
         type="text" 
         name="pincode"
         style={inputStyle}

@@ -75,22 +75,11 @@ const HeroBanner = ({ w }: HeroBannerProps) => {
   const [current, setCurrent] = useState(cloneCount);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
-  const [aspectRatio, setAspectRatio] = useState(16 / 9); // default fallback
+  const aspectRatio = 1280 / 548; // Lock to required banner dimensions
 
   const trackRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef(current);
   currentRef.current = current;
-
-  // 🔥 Load image & calculate ratio
-  useEffect(() => {
-    const img = new Image();
-    img.src = banners[((current - cloneCount) % total + total) % total];
-
-    img.onload = () => {
-      const ratio = img.naturalWidth / img.naturalHeight;
-      setAspectRatio(ratio);
-    };
-  }, [current]);
 
   // Responsive
   const isDesktop = w >= 1200;

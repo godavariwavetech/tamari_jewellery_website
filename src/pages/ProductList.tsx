@@ -1163,7 +1163,7 @@ export default function ProductList() {
         padding: "40px 32px 60px",
         fontFamily: SF,
       }} className="page-padding">
-        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div style={{ maxWidth: 1800, margin: "0 auto" }}>
 
           {/* Page heading */}
           <div style={{ textAlign: "center", marginBottom: 36 }}>
@@ -1183,7 +1183,17 @@ export default function ProductList() {
           </div>
 
           {/* Mobile Filter Toggle */}
-          <div style={{ display: 'none', marginBottom: 16 }} className="sidebar-mobile">
+          <div style={{ 
+            display: 'none', 
+            marginBottom: 16,
+            position: '-webkit-sticky',
+            position: 'sticky' as any,
+            top: 80,
+            zIndex: 40,
+            backgroundColor: '#f9f9f7',
+            padding: '10px 0',
+            marginTop: '-10px',
+          }} className="sidebar-mobile">
             <button
               onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
               style={{
@@ -1209,7 +1219,21 @@ export default function ProductList() {
 
           {/* Layout: sidebar + grid */}
           <div style={{ display: "flex", gap: 36, alignItems: "flex-start" }} className="product-layout">
-            <div className="sidebar-desktop" style={{ display: 'block' }}>
+            <div className="sidebar-desktop" style={{ 
+              display: 'block',
+              position: '-webkit-sticky',
+              position: 'sticky' as any,
+              top: '100px', /* Offset for navbar/spacing */
+              maxHeight: 'calc(100vh - 120px)', /* Viewport height minus spacing */
+              overflowY: 'auto',
+              scrollbarWidth: 'none', /* Firefox */
+              msOverflowStyle: 'none' /* IE/Edge */
+            }}>
+              <style>{`
+                .sidebar-desktop::-webkit-scrollbar {
+                  display: none;
+                }
+              `}</style>
               <Sidebar
                 allProducts={allProducts}
                 filters={filters}

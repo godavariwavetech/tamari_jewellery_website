@@ -243,7 +243,8 @@ export default function ProductDetail() {
         // Default the purity selector to the product's actual karat — otherwise the
         // first render shows "18KT" selected even when the stored prices are for 22KT.
         if (productData.karat) {
-          setPurity(`${productData.karat}KT`);
+          const firstKarat = String(productData.karat).split(',')[0].trim();
+          setPurity(`${firstKarat}KT`);
         }
 
         // Default the size selector to the first size returned from the variant_sizes
@@ -286,80 +287,48 @@ export default function ProductDetail() {
 
   const isMobile = windowWidth < 768;
 
-  // Compute the price breakup live so it reacts to purity changes.
-  // Mirrors the backend formula in getproductdetails (mainCtrl.js):
-  //   metal_value  = gross_weight × rate_per_gram × (karat / 24)   [Gold only]
-  //   va_amount    = metal_value × VA_percentage / 100
-  //   sub_total    = metal_value + making_charges + va_amount + diamond_value + stone_value
-  //   gst_amount   = sub_total × gst_percentage / 100
-  //   total_price  = sub_total + gst_amount
+  // Price breakup — mirrors the PDF formula implemented on the backend
+  // (`tamarijewllesapi/utils/priceCalculator.js`). Single source of truth lives
+  // there; this memo only re-runs it locally so the user can preview the
+  // 22KT price when the product is stored at 18KT (and vice versa).
   //
-  // Karat handling — to keep the displayed numbers consistent with what the backend
-  // would compute if the product were stored at the selected karat, we:
-  //   • At the product's STORED karat → use backend's exact `metal_value` and
-  //     `makingcharges` (zero rounding drift, matches what `total_price` was built on).
-  //   • At any OTHER karat (Gold only) → recompute from `metal_rate` × `gross_weight`
-  //     scaled by `selectedKarat / productKarat`, then redo making (with VA%) and GST.
-  //     Scaling the already-rounded `metal_value` directly compounds the error and
-  //     drifts a few rupees on the total — using `metal_rate` × `gross_weight` cuts that.
+  // PDF formula (LOCKET example: 5.5g net, 18KT, 16% VA, ₹750/g making):
+  //   final_gold_wt  = net × (purity% + VA%) / purity%     = 5.5 × 92/76 = 6.658g
+  //   gold_value     = final_gold_wt × (rate_24k × purity%) = 6.658 × ₹11,575 = ₹77,068
+  //   making_wt      = net × (1 + VA%/100)                 = 5.5 × 1.16 = 6.380g
+  //   making_value   = making_wt × making_charges_per_gram = 6.380 × ₹750 = ₹4,785
+  //   certificate    = diamond_ct × ₹850                   = 2.5 × 850 = ₹2,125
+  //   subtotal       = gold + making + diamond + stone + certificate
+  //   total          = subtotal × (1 + GST/100)            (GST = 3% for jewellery)
+  //
+  // At the product's STORED karat we use backend's exact values (zero drift —
+  // those numbers feed cart, checkout, invoice). At any OTHER karat we recompute
+  // locally; total = sum of rows (no backend reference to pin to).
   type BreakupRow = { label: string; amount: number };
+
+  // Indian jewellery industry hallmark purity ratios (PDF page 2: 18KT=76%, 22KT=92%).
+  // Keep in lockstep with PURITY_MAP in backend priceCalculator.js.
+  const PURITY_MAP: Record<number, number> = { 14: 0.585, 18: 0.76, 22: 0.92, 24: 1.00 };
+  const CERTIFICATE_RATE_PER_CT = 850; // PDF "Other" row, hardcoded per business decision.
+
+  const purityFactor = (karat: number) =>
+    PURITY_MAP[karat] !== undefined ? PURITY_MAP[karat] : karat / 24;
+
+  const availableKarats = useMemo(() => {
+    if (!product?.karat) return ["18KT", "22KT"];
+    const k = String(product.karat).split(',').map(v => v.trim()).filter(v => v);
+    if (k.length === 0) return ["18KT", "22KT"];
+    return k.map(v => `${v}KT`);
+  }, [product?.karat]);
+
   const breakup = useMemo<{ rows: BreakupRow[]; total: number } | null>(() => {
+    debugger
     if (!product) return null;
 
-    const selectedKarat = parseInt(purity, 10) || product.karat || 0;
-    const productKarat = product.karat || selectedKarat || 0;
+    const productKaratValue = parseInt(String(product.karat || "").split(',')[0].trim(), 10) || 0;
+    const selectedKarat = parseInt(purity, 10) || productKaratValue || 0;
+    const sameKarat = selectedKarat === productKaratValue;
     const isGold = (product.metal_name || "").toLowerCase() === "gold";
-    const sameKarat = selectedKarat === productKarat;
-
-    const grossWeight = Number(product.gross_weight || 0);
-    const ratePerGram = Number(product.rate_per_gram || 0); // raw 24K rate from backend (unrounded source)
-    const baseMetalValue = Number(product.metal_value || 0);
-
-    // metalValue: at the stored karat use backend's exact figure; otherwise compute
-    // from `rate_per_gram` (the unrounded 24K rate) — same formula the backend uses,
-    // so it matches what the backend would return if karat were the selected value.
-    let metalValue: number;
-    if (sameKarat || !isGold) {
-      metalValue = baseMetalValue;
-    } else if (ratePerGram > 0 && grossWeight > 0) {
-      // Backend formula: ROUND(gross_weight × rate_per_gram × karat / 24, 2)
-      metalValue = Number((grossWeight * ratePerGram * (selectedKarat / 24)).toFixed(2));
-    } else if (productKarat > 0) {
-      // Fallback if rate_per_gram isn't in the response: scale the rounded metal_value.
-      metalValue = baseMetalValue * (selectedKarat / productKarat);
-    } else {
-      metalValue = baseMetalValue;
-    }
-
-    // Making charge: VA scales with metal, raw making_charges does not.
-    // At the stored karat → use backend's combined `makingcharges` directly (exact).
-    // At a different karat → recompute from raw `making_charges` + `VA_percentage` when available.
-    const rawMaking = Number(product.making_charges ?? NaN);
-    const vaPercent = Number(product.VA_percentage ?? NaN);
-    let makingChargeRow: number;
-    if (sameKarat) {
-      makingChargeRow = Number(product.makingcharges || 0);
-    } else if (!Number.isNaN(rawMaking) && !Number.isNaN(vaPercent)) {
-      makingChargeRow = rawMaking + metalValue * (vaPercent / 100);
-    } else {
-      // No raw fields available — fall back to scaling the combined value, which is
-      // an approximation (over-applies VA scaling to the raw making portion). Better
-      // than showing zero, and only triggered when the API doesn't expose the raw fields.
-      makingChargeRow = Number(product.makingcharges || 0);
-    }
-
-    const diamondValue = product.has_diamond === 1 ? Number(product.diamond_value || 0) : 0;
-    const stoneValue = product.has_stone === 1 ? Number(product.stone_value || 0) : 0;
-
-    // GST: at stored karat, use backend's exact gst_amount + total_price for zero drift.
-    const subTotal = metalValue + makingChargeRow + diamondValue + stoneValue;
-    const gstPercent = Number(product.gst_percentage || 0);
-    const gstAmount = sameKarat
-      ? Number(product.gst_amount || 0)
-      : subTotal * (gstPercent / 100);
-    const total = sameKarat
-      ? Number(product.total_price ?? product.price ?? Math.round(subTotal + gstAmount))
-      : Math.round(subTotal + gstAmount);
 
     const metalLabel = product.metal_name
       ? `${product.metal_name}${selectedKarat ? ` ${selectedKarat}KT` : ""}${product.gross_weight ? ` (${product.gross_weight} g)` : ""}`
@@ -367,13 +336,62 @@ export default function ProductDetail() {
     const diamondLabel = product.diamond_weight ? `Diamond (${product.diamond_weight} ct)` : "Diamond";
     const gstLabel = product.gst_percentage != null ? `GST (${product.gst_percentage}%)` : "GST";
 
-    // Round each line item to the nearest whole rupee — INR convention, and avoids
-    // showing fractional paise that confuse the user when comparing rows to total.
+    // ── Stored karat: use backend's exact values (no recompute). ──────────
+    if (sameKarat) {
+      const metalValue = Number(product.metal_value || 0);
+      const makingValue = Number(product.making_value ?? product.makingcharges ?? 0);
+      const diamondValue = product.has_diamond === 1 ? Number(product.diamond_value || 0) : 0;
+      const stoneValue = product.has_stone === 1 ? Number(product.stone_value || 0) : 0;
+      const certificateValue = product.has_diamond === 1 ? Number(product.certificate_value || 0) : 0;
+      const gstAmount = Number(product.gst_amount || 0);
+      const total = Number(product.total_price ?? product.price ?? 0);
+
+      const rows: BreakupRow[] = [];
+      if (metalValue > 0) rows.push({ label: metalLabel, amount: Math.round(metalValue) });
+      if (diamondValue > 0) rows.push({ label: diamondLabel, amount: Math.round(diamondValue) });
+      if (stoneValue > 0) rows.push({ label: "Stone", amount: Math.round(stoneValue) });
+      rows.push({ label: "Making Charge", amount: Math.round(makingValue) });
+      if (certificateValue > 0) rows.push({ label: "Certificate", amount: Math.round(certificateValue) });
+      if (gstAmount > 0) rows.push({ label: gstLabel, amount: Math.round(gstAmount) });
+      return { rows, total };
+    }
+
+    // ── Toggled karat: recompute PDF formula locally; total = sum of rows. ─
+    const netWt = Number(product.net_weight || 0);
+    const vaPct = Number(product.VA_percentage || 0);
+    const makingPerGram = Number(product.making_charges || 0); // ₹/gram (NOT total)
+    const rate24k = Number(product.rate_per_gram || 0);
+
+    let metalValue: number;
+    if (isGold) {
+      debugger
+      const purityPct = purityFactor(selectedKarat) * 100;
+      const finalGoldWt = purityPct > 0 ? netWt * (purityPct + vaPct) / purityPct : 0;
+      const karatRate = rate24k * purityFactor(selectedKarat);
+      metalValue = finalGoldWt * karatRate;
+    } else {
+      metalValue = netWt * rate24k;
+    }
+
+    const makingWt = netWt * (1 + vaPct / 100);
+    const makingValue = makingWt * makingPerGram;
+
+    const diamondCt = Number(product.diamond_weight || 0);
+    const diamondValue = product.has_diamond === 1 ? Number(product.diamond_value || 0) : 0;
+    const stoneValue = product.has_stone === 1 ? Number(product.stone_value || 0) : 0;
+    const certificateValue = product.has_diamond === 1 ? diamondCt * CERTIFICATE_RATE_PER_CT : 0;
+
+    const subTotal = metalValue + makingValue + diamondValue + stoneValue + certificateValue;
+    const gstPercent = Number(product.gst_percentage || 0);
+    const gstAmount = subTotal * (gstPercent / 100);
+    const total = Math.round(subTotal + gstAmount);
+
     const rows: BreakupRow[] = [];
     if (metalValue > 0) rows.push({ label: metalLabel, amount: Math.round(metalValue) });
     if (diamondValue > 0) rows.push({ label: diamondLabel, amount: Math.round(diamondValue) });
     if (stoneValue > 0) rows.push({ label: "Stone", amount: Math.round(stoneValue) });
-    rows.push({ label: "Making Charge", amount: Math.round(makingChargeRow) }); // always shown, even at 0
+    rows.push({ label: "Making Charge", amount: Math.round(makingValue) });
+    if (certificateValue > 0) rows.push({ label: "Certificate", amount: Math.round(certificateValue) });
     if (gstAmount > 0) rows.push({ label: gstLabel, amount: Math.round(gstAmount) });
 
     return { rows, total };
@@ -807,7 +825,7 @@ export default function ProductDetail() {
               <div style={{ marginBottom: 20 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", margin: "0 0 10px" }}>Purity :</p>
                 <div style={{ display: "flex", gap: 10 }}>
-                  {["18KT", "22KT"].map(k => (
+                  {availableKarats.map(k => (
                     <button key={k} onClick={() => setPurity(k)} style={{
                       padding: isMobile ? "8px 16px" : "8px 22px", borderRadius: 8, fontSize: 14, fontWeight: 600,
                       cursor: "pointer", transition: "all 0.15s",
