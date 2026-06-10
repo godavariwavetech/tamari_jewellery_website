@@ -1184,9 +1184,8 @@ export default function ProductList() {
 
           {/* Mobile Filter Toggle */}
           <div style={{ 
-            display: 'none', 
+            display: 'none',
             marginBottom: 16,
-            position: '-webkit-sticky',
             position: 'sticky' as any,
             top: 80,
             zIndex: 40,
@@ -1221,7 +1220,6 @@ export default function ProductList() {
           <div style={{ display: "flex", gap: 36, alignItems: "flex-start" }} className="product-layout">
             <div className="sidebar-desktop" style={{ 
               display: 'block',
-              position: '-webkit-sticky',
               position: 'sticky' as any,
               top: '100px', /* Offset for navbar/spacing */
               maxHeight: 'calc(100vh - 120px)', /* Viewport height minus spacing */
