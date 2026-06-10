@@ -310,6 +310,8 @@ export default function ProductDetail() {
   // Keep in lockstep with PURITY_MAP in backend priceCalculator.js.
   const PURITY_MAP: Record<number, number> = { 14: 0.585, 18: 0.76, 22: 0.92, 24: 1.00 };
   const CERTIFICATE_RATE_PER_CT = 850; // PDF "Other" row, hardcoded per business decision.
+  // Flat per-gram premium on the karat rate — mirrors backend GOLD_KARAT_PREMIUM_PER_GRAM.
+  const GOLD_KARAT_PREMIUM_PER_GRAM = 25;
 
   const purityFactor = (karat: number) =>
     PURITY_MAP[karat] !== undefined ? PURITY_MAP[karat] : karat / 24;
@@ -321,8 +323,7 @@ export default function ProductDetail() {
     return k.map(v => `${v}KT`);
   }, [product?.karat]);
 
-  const breakup = useMemo<{ rows: BreakupRow[]; total: number } | null>(() => {
-    debugger
+  const breakup = useMemo<{ rows: BreakupRow[]; subTotal: number; gstAmount: number; gstLabel: string; total: number } | null>(() => {
     if (!product) return null;
 
     const productKaratValue = parseInt(String(product.karat || "").split(',')[0].trim(), 10) || 0;
@@ -336,6 +337,14 @@ export default function ProductDetail() {
     const diamondLabel = product.diamond_weight ? `Diamond (${product.diamond_weight} ct)` : "Diamond";
     const gstLabel = product.gst_percentage != null ? `GST (${product.gst_percentage}%)` : "GST";
 
+    // For gold, spell out the per-gram karat rate and that VA (wastage) is
+    // included, e.g. "Gold 18KT (5.5 g) @ ₹11,752/g + 16% VA", so the customer
+    // can see how the metal value was built. Non-gold rows stay plain.
+    const goldSuffix = (rate: number, va: number) =>
+      isGold
+        ? `${rate > 0 ? ` @ ₹${Math.round(rate).toLocaleString("en-IN")}/g` : ""}${va > 0 ? ` + ${va}% VA` : ""}`
+        : "";
+
     // ── Stored karat: use backend's exact values (no recompute). ──────────
     if (sameKarat) {
       const metalValue = Number(product.metal_value || 0);
@@ -346,28 +355,33 @@ export default function ProductDetail() {
       const gstAmount = Number(product.gst_amount || 0);
       const total = Number(product.total_price ?? product.price ?? 0);
 
+      // Keep paisa — match the backend / client invoice exactly (no rounding).
+      // GST is kept OUT of `rows` so the UI can show Subtotal → GST → Total.
+      const goldLabel = metalLabel + goldSuffix(Number(product.karat_rate || 0), Number(product.va_percentage || 0));
       const rows: BreakupRow[] = [];
-      if (metalValue > 0) rows.push({ label: metalLabel, amount: Math.round(metalValue) });
-      if (diamondValue > 0) rows.push({ label: diamondLabel, amount: Math.round(diamondValue) });
-      if (stoneValue > 0) rows.push({ label: "Stone", amount: Math.round(stoneValue) });
-      rows.push({ label: "Making Charge", amount: Math.round(makingValue) });
-      if (certificateValue > 0) rows.push({ label: "Certificate", amount: Math.round(certificateValue) });
-      if (gstAmount > 0) rows.push({ label: gstLabel, amount: Math.round(gstAmount) });
-      return { rows, total };
+      if (metalValue > 0) rows.push({ label: goldLabel, amount: metalValue });
+      if (diamondValue > 0) rows.push({ label: diamondLabel, amount: diamondValue });
+      if (stoneValue > 0) rows.push({ label: "Stone", amount: stoneValue });
+      rows.push({ label: "Making Charge", amount: makingValue });
+      if (certificateValue > 0) rows.push({ label: "Certificate", amount: certificateValue });
+      const subTotal = metalValue + makingValue + diamondValue + stoneValue + certificateValue;
+      return { rows, subTotal, gstAmount, gstLabel, total };
     }
 
-    // ── Toggled karat: recompute PDF formula locally; total = sum of rows. ─
+    // ── Toggled karat: recompute locally (matches backend priceCalculator). ─
     const netWt = Number(product.net_weight || 0);
-    const vaPct = Number(product.VA_percentage || 0);
+    // VA is role-resolved by the backend and independent of the selected karat,
+    // so reuse it here (the old flat VA_percentage column was dropped).
+    const vaPct = Number(product.va_percentage || 0);
     const makingPerGram = Number(product.making_charges || 0); // ₹/gram (NOT total)
     const rate24k = Number(product.rate_per_gram || 0);
 
     let metalValue: number;
+    let karatRate = 0;
     if (isGold) {
-      debugger
-      const purityPct = purityFactor(selectedKarat) * 100;
-      const finalGoldWt = purityPct > 0 ? netWt * (purityPct + vaPct) / purityPct : 0;
-      const karatRate = rate24k * purityFactor(selectedKarat);
+      const purityFrac = purityFactor(selectedKarat);
+      karatRate = rate24k * purityFrac + GOLD_KARAT_PREMIUM_PER_GRAM; // (24K × purity) + ₹25/g
+      const finalGoldWt = purityFrac > 0 ? netWt * (purityFrac + vaPct / 100) / purityFrac : 0;
       metalValue = finalGoldWt * karatRate;
     } else {
       metalValue = netWt * rate24k;
@@ -384,17 +398,19 @@ export default function ProductDetail() {
     const subTotal = metalValue + makingValue + diamondValue + stoneValue + certificateValue;
     const gstPercent = Number(product.gst_percentage || 0);
     const gstAmount = subTotal * (gstPercent / 100);
-    const total = Math.round(subTotal + gstAmount);
+    const total = subTotal + gstAmount;
 
+    // Keep paisa — match the backend / client invoice exactly (no rounding).
+    // GST is kept OUT of `rows` so the UI can show Subtotal → GST → Total.
+    const goldLabel = metalLabel + goldSuffix(karatRate, vaPct);
     const rows: BreakupRow[] = [];
-    if (metalValue > 0) rows.push({ label: metalLabel, amount: Math.round(metalValue) });
-    if (diamondValue > 0) rows.push({ label: diamondLabel, amount: Math.round(diamondValue) });
-    if (stoneValue > 0) rows.push({ label: "Stone", amount: Math.round(stoneValue) });
-    rows.push({ label: "Making Charge", amount: Math.round(makingValue) });
-    if (certificateValue > 0) rows.push({ label: "Certificate", amount: Math.round(certificateValue) });
-    if (gstAmount > 0) rows.push({ label: gstLabel, amount: Math.round(gstAmount) });
+    if (metalValue > 0) rows.push({ label: goldLabel, amount: metalValue });
+    if (diamondValue > 0) rows.push({ label: diamondLabel, amount: diamondValue });
+    if (stoneValue > 0) rows.push({ label: "Stone", amount: stoneValue });
+    rows.push({ label: "Making Charge", amount: makingValue });
+    if (certificateValue > 0) rows.push({ label: "Certificate", amount: certificateValue });
 
-    return { rows, total };
+    return { rows, subTotal, gstAmount, gstLabel, total };
   }, [product, purity]);
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
@@ -763,26 +779,48 @@ export default function ProductDetail() {
               {showPriceBreakup && breakup && (
                 <div style={{
                   background: "#fff",
-                  border: "1px solid #e5e7eb",
+                  border: `1px solid ${GOLD}33`,
                   borderRadius: 12,
                   padding: "20px",
                   marginBottom: 20,
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                  overflow: "hidden",
                 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 16px" }}>PRICE BREAKUP</h3>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: GOLD, letterSpacing: 0.5, margin: "0 0 16px" }}>PRICE BREAKUP</h3>
 
-                  <div style={{ marginBottom: 16 }}>
+                  <div>
+                    {/* Component line items */}
                     {breakup.rows.map(r => (
-                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                        <span style={{ color: "#6b7280" }}>{r.label}</span>
-                        <span style={{ fontWeight: 600 }}>{format(r.amount, { inputIncludesGst: false })}</span>
+                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
+                        <span style={{ color: "#6b7280", fontSize: 14 }}>{r.label}</span>
+                        <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>{format(r.amount, { inputIncludesGst: false })}</span>
                       </div>
                     ))}
-                    <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "12px 0" }} />
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ fontWeight: 700, fontSize: 16 }}>Total</span>
-                      <span style={{ fontWeight: 700, fontSize: 16 }}>{format(breakup.total, { inputIncludesGst: true })}</span>
+
+                    {/* Subtotal (before GST) */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: "1px dashed #e5e7eb" }}>
+                      <span style={{ fontWeight: 600, color: "#374151" }}>Subtotal</span>
+                      <span style={{ fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{format(breakup.subTotal, { inputIncludesGst: false })}</span>
                     </div>
+
+                    {/* GST */}
+                    {breakup.gstAmount > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+                        <span style={{ color: "#6b7280", fontSize: 14 }}>{breakup.gstLabel}</span>
+                        <span style={{ fontWeight: 600, color: "#6b7280", whiteSpace: "nowrap" }}>+ {format(breakup.gstAmount, { inputIncludesGst: false })}</span>
+                      </div>
+                    )}
+
+                    {/* Grand total — highlighted */}
+                    <div style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      marginTop: 14, padding: "12px 14px",
+                      background: `${GOLD}14`, border: `1px solid ${GOLD}33`, borderRadius: 8,
+                    }}>
+                      <span style={{ fontWeight: 700, fontSize: 16, color: "#111827" }}>Total</span>
+                      <span style={{ fontWeight: 700, fontSize: 18, color: GOLD, whiteSpace: "nowrap" }}>{format(breakup.total, { inputIncludesGst: true })}</span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#9ca3af", margin: "8px 0 0", textAlign: "right" }}>Inclusive of all taxes</p>
                   </div>
                 </div>
               )}

@@ -51,7 +51,7 @@ interface CurrencyContextValue {
   isForeign: boolean;
 }
 
-const FALLBACK_INR: Currency = { code: 'INR', symbol: '₹', rate_from_inr: 1, decimals: 0, locale: 'en-IN' };
+const FALLBACK_INR: Currency = { code: 'INR', symbol: '₹', rate_from_inr: 1, decimals: 2, locale: 'en-IN' };
 const INDIAN_GST = 0.03; // 3% — must match backend price calculations
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
@@ -147,7 +147,7 @@ export function useCurrency(): CurrencyContextValue {
       currencies: [FALLBACK_INR],
       setCurrency: () => {},
       convert: (n) => n,
-      format: (n) => `₹${Math.round(n).toLocaleString('en-IN')}`,
+      format: (n) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       isLoaded: false,
       isForeign: false,
     };

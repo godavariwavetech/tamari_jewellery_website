@@ -1,5 +1,19 @@
 const BASE_URL = import.meta.env.VITE_BASE_URL  || 'https://tamarijewellersapi.godavariwave.com/website_api';
 
+// Current logged-in role drives B2B vs B2C pricing on the backend (the product's
+// business_type array carries a different VA % per role). Read straight from
+// localStorage rather than importing authService to avoid a circular import
+// (auth.ts already imports this module). Anonymous visitors → 'b2c' (retail).
+function getCurrentRole(): 'b2c' | 'b2b' {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return 'b2c';
+    return JSON.parse(raw)?.role === 'b2b' ? 'b2b' : 'b2c';
+  } catch {
+    return 'b2c';
+  }
+}
+
 
 // API Response Types
 export interface Category {
@@ -68,6 +82,10 @@ export interface ProductDetail extends Product {
   no_of_diamonds?: number | string;
   diamond_setting?: string;
   diamond_shape?: string;
+  daimond_details?: Array<{diamond_type?: string; diamond_clarity?:string; diamond_color?:string; no_of_diamonds?: number; 
+    diamond_setting?:string; diamond_shape?:string; diamond_weight?: string | number; diamond_sieve_size_range?:string;
+    diamond_sieve_size?:string | number; diamond_price_per_ct?:number | string; diamond_price?: number
+  }>
   stone_details?: Array<{ stone_name?: string; stone_weight?: string | number; stone_charges?: string | number }>;
   // Weights (from z_all_products)
   net_weight?: number;          // pure metal weight (admin-entered, already net of stones)
@@ -83,7 +101,11 @@ export interface ProductDetail extends Product {
   making_value?: number;        // net × (1+VA/100) × making_charges_per_gram
   makingcharges?: number;       // legacy alias for making_value (kept for backward compat)
   making_charges?: number;      // raw per-gram making rate (₹/gram, NOT total ₹)
-  VA_percentage?: number;       // wastage % — used in PDF gold weight + making formulas
+  VA_percentage?: number;       // legacy flat wastage % (dropped in DB; kept for back-compat)
+  b2b_va_percentage?: string;   // role-specific wastage % (B2B)
+  b2c_va_percentage?: string;   // role-specific wastage % (B2C)
+  va_percentage?: number;       // VA actually applied for the logged-in role (from backend)
+  karat_rate?: number;          // per-gram rate applied for the metal (gold only)
   sub_total?: number;
   gst_percentage?: number;
   gst_amount?: number;
@@ -465,7 +487,7 @@ export const apiService = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ categoryId: categoryId || '', page }),
+        body: JSON.stringify({ categoryId: categoryId || '', page, role: getCurrentRole() }),
       });
       
       if (!response.ok) {
@@ -626,7 +648,7 @@ export const apiService = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(filters),
+        body: JSON.stringify({ ...filters, role: getCurrentRole() }),
       });
       
       if (!response.ok) {
@@ -658,9 +680,10 @@ export const apiService = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          product_id: productId, 
-          user_id: userId || ""
+        body: JSON.stringify({
+          product_id: productId,
+          user_id: userId || "",
+          role: getCurrentRole()
         }),
       });
       
@@ -714,9 +737,10 @@ export const apiService = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           limit,
-          user_id: userId ? userId.toString() : ""
+          user_id: userId ? userId.toString() : "",
+          role: getCurrentRole()
         }),
       });
       
@@ -1241,7 +1265,7 @@ export const apiService = {
       }));
     } catch (err) {
       console.warn('Failed to fetch currencies, defaulting to INR only:', err);
-      return [{ code: 'INR', symbol: '₹', rate_from_inr: 1, decimals: 0, locale: 'en-IN' }];
+      return [{ code: 'INR', symbol: '₹', rate_from_inr: 1, decimals: 2, locale: 'en-IN' }];
     }
   },
 
