@@ -70,9 +70,8 @@ const ShippingQIcon = () => (
 /* ── Swatches ── */
 const COLOR_MAP: Record<string, string> = {
   yellow: "#F8E582",
-  pink: "#F8C6C6",
   white: "#DDDDDD",
-  rose: "#F8C6C6", // Mapping rose to pink as well
+  rose: "#E0B0A0", // rose gold (warm pinkish-copper metal, not bubblegum pink)
 };
 
 /* ── Similar products ── */
@@ -236,7 +235,7 @@ export default function ProductDetail() {
         if (productData.material_color) {
           const mColor = productData.material_color.toLowerCase();
           if (mColor.includes("yellow")) setColor("Yellow Gold");
-          else if (mColor.includes("pink") || mColor.includes("rose")) setColor("Pink Gold");
+          else if (mColor.includes("pink") || mColor.includes("rose")) setColor("Rose Gold");
           else if (mColor.includes("white")) setColor("White Gold");
         }
 
@@ -331,10 +330,17 @@ export default function ProductDetail() {
     const sameKarat = selectedKarat === productKaratValue;
     const isGold = (product.metal_name || "").toLowerCase() === "gold";
 
+    // Show NET weight on the metal row — that's the weight the gold value is
+    // priced on (gross includes stones/diamonds, which are charged separately).
     const metalLabel = product.metal_name
-      ? `${product.metal_name}${selectedKarat ? ` ${selectedKarat}KT` : ""}${product.gross_weight ? ` (${product.gross_weight} g)` : ""}`
+      ? `${product.metal_name}${selectedKarat ? ` ${selectedKarat}KT` : ""}${product.net_weight ? ` Nt Wt: ${product.net_weight} g` : ""}`
       : "Metal";
-    const diamondLabel = product.diamond_weight ? `Diamond (${product.diamond_weight} ct)` : "Diamond";
+    const diamondLabel = product.diamond_weight ? `Diamond Wt: ${product.diamond_weight} ct` : "Diamond";
+    // Stone weight = sum of stone_weight across the stone_details rows.
+    const stoneCt = Array.isArray(product.stone_details)
+      ? product.stone_details.reduce((sum: number, s: any) => sum + Number(s?.stone_weight || 0), 0)
+      : 0;
+    const stoneLabel = stoneCt > 0 ? `Stone Wt: ${stoneCt} ct` : "Stone";
     const gstLabel = product.gst_percentage != null ? `GST (${product.gst_percentage}%)` : "GST";
 
     // For gold, spell out the per-gram karat rate and that VA (wastage) is
@@ -361,9 +367,9 @@ export default function ProductDetail() {
       const rows: BreakupRow[] = [];
       if (metalValue > 0) rows.push({ label: goldLabel, amount: metalValue });
       if (diamondValue > 0) rows.push({ label: diamondLabel, amount: diamondValue });
-      if (stoneValue > 0) rows.push({ label: "Stone", amount: stoneValue });
+      if (stoneValue > 0) rows.push({ label: stoneLabel, amount: stoneValue });
       rows.push({ label: "Making Charge", amount: makingValue });
-      if (certificateValue > 0) rows.push({ label: "Certificate", amount: certificateValue });
+      if (certificateValue > 0) rows.push({ label: "Certification Charges", amount: certificateValue });
       const subTotal = metalValue + makingValue + diamondValue + stoneValue + certificateValue;
       return { rows, subTotal, gstAmount, gstLabel, total };
     }
@@ -406,7 +412,7 @@ export default function ProductDetail() {
     const rows: BreakupRow[] = [];
     if (metalValue > 0) rows.push({ label: goldLabel, amount: metalValue });
     if (diamondValue > 0) rows.push({ label: diamondLabel, amount: diamondValue });
-    if (stoneValue > 0) rows.push({ label: "Stone", amount: stoneValue });
+    if (stoneValue > 0) rows.push({ label: stoneLabel, amount: stoneValue });
     rows.push({ label: "Making Charge", amount: makingValue });
     if (certificateValue > 0) rows.push({ label: "Certificate", amount: certificateValue });
 
@@ -688,7 +694,7 @@ export default function ProductDetail() {
                   const hasDiamondData = product?.has_diamond === 1;
                   const diamondRows: Row[] = hasDiamondData ? [
                     { label: "Diamond Weight", value: product?.diamond_weight ? `${product.diamond_weight} ct` : undefined },
-                    { label: "Diamond Pieces", value: product?.no_of_diamonds },
+                    { label: "Diamond Pieces", value: product?.no_of_diamonds ? `${product.no_of_diamonds} pcs`: undefined },
                     { label: "Diamond Quality", value: product?.diamond_clarity },
                     { label: "Diamond Colour", value: product?.diamond_color },
                     { label: "Diamond Shape", value: product?.diamond_shape },
@@ -834,15 +840,15 @@ export default function ProductDetail() {
                   {Object.entries(COLOR_MAP).filter(([key]) => {
                     if (!product?.material_color) return key === "white"; // default if missing
                     const mColor = product.material_color.toLowerCase();
-                    if (key === "rose") return false; // pink + rose share a swatch; only render under "pink"
                     // Each color is checked independently — a product with material_color
                     // "Yellow, White" should show BOTH swatches, not just the first match.
                     if (key === "yellow") return mColor.includes("yellow");
-                    if (key === "pink") return mColor.includes("pink") || mColor.includes("rose");
+                    // "rose" also matches legacy "pink" data, but always shows as Rose Gold.
+                    if (key === "rose") return mColor.includes("rose") || mColor.includes("pink");
                     if (key === "white") return mColor.includes("white");
                     return false;
                   }).map(([key, hex]) => {
-                    const label = key === "yellow" ? "Yellow Gold" : key === "pink" ? "Pink Gold" : "White Gold";
+                    const label = key === "yellow" ? "Yellow Gold" : key === "rose" ? "Rose Gold" : "White Gold";
                     const isSelected = color === label;
                     return (
                       <div key={key} onClick={() => setColor(label)} style={{

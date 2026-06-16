@@ -62,119 +62,178 @@ function GoldRatePopup() {
   const r22 = Number(src.gold_22k) || r24 * (22 / 24); // 91.66% of 24K
   const r18 = Number(src.gold_18k) || r24 * (18 / 24); // 75%   of 24K
   const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
-console.log(rateData,"ratedataaaaaaaaaaaa")
+
+  // Palette — light cream/gold to match the printed rate card.
+  const GOLD = '#b8902f';
+  const GOLD_SOFT = '#e7d4a0';
+  const INK = '#4a3a1f';
+  const MUTED = '#9a8868';
+
   const rows = [
-    { karat: '24 KTS (999)',   tax: 'Including 3 % GST', price: fmt(r24 * 100 * (1 + GST)), unit: '(100 Grams)' },
-    { karat: '22 KTS (91.65)', tax: 'Without 3 % GST',    price: fmt(r22),                   unit: '(Per Grams)' },
-    { karat: '22 KTS (91.65)', tax: 'Including 3 % GST',  price: fmt(r22 * (1 + GST)),       unit: '(Per Grams)' },
-    { karat: '18 KTS (750)',   tax: 'Without 3 % GST',    price: fmt(r18),                   unit: '(Per Grams)' },
-    { karat: '18 KTS (750)',   tax: 'Including 3 % GST',  price: fmt(r18 * (1 + GST)),       unit: '(Per Grams)' },
+    { kt: '24', fine: '(999)',   tax: 'Including 3% GST', unit: '(100 Grams)',  price: fmt(r24 * 100 * (1 + GST)), icon: 'bars' },
+    { kt: '22', fine: '(91.65)', tax: 'Without 3% GST',   unit: '(1 Per Gram)', price: fmt(r22),                   icon: 'scale' },
+    { kt: '22', fine: '(91.65)', tax: 'Including 3% GST', unit: '(1 Per Gram)', price: fmt(r22 * (1 + GST)),       icon: 'shield' },
+    { kt: '18', fine: '(750)',   tax: 'Without 3% GST',   unit: '(1 Per Gram)', price: fmt(r18),                   icon: 'diamond' },
+    { kt: '18', fine: '(750)',   tax: 'Including 3% GST', unit: '(1 Per Gram)', price: fmt(r18 * (1 + GST)),       icon: 'rupee' },
   ];
 
-  const PhoneIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-    </svg>
-  );
-  const PinIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
+  const RowIcon = ({ type }: { type: string }) => {
+    switch (type) {
+      case 'bars': return (
+        <svg width="30" height="30" viewBox="0 0 24 24" fill={GOLD}>
+          <rect x="2.5" y="14" width="8" height="5" rx="1" /><rect x="13.5" y="14" width="8" height="5" rx="1" /><rect x="8" y="8" width="8" height="5" rx="1" />
+        </svg>);
+      case 'scale': return (
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3v18M6 21h12M5 7l14-2M5 7l-3 6a3 3 0 0 0 6 0zM19 5l3 6a3 3 0 0 1-6 0z" />
+        </svg>);
+      case 'shield': return (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill={GOLD}>
+          <path d="M12 2l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V5z" />
+          <path d="M9.5 12l1.8 1.8 3.4-3.6" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>);
+      case 'diamond': return (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill={GOLD}>
+          <path d="M6 3h12l3.5 5L12 21.5 2.5 8z" />
+          <path d="M2.5 8h19M9 3l3 5 3-5M12 8v13.5" fill="none" stroke="#fff" strokeWidth="0.8" opacity="0.55" />
+        </svg>);
+      case 'rupee': return (
+        <svg width="28" height="28" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" fill={GOLD} />
+          <text x="12" y="16.5" textAnchor="middle" fontSize="13" fontWeight="700" fill="#fff" fontFamily="serif">₹</text>
+        </svg>);
+      default: return null;
+    }
+  };
+
+  const Flourish = () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '5px 0 9px' }}>
+      <span style={{ color: GOLD, fontSize: 11 }}>❖</span>
+      <div style={{ width: 34, height: 1, background: `linear-gradient(90deg, transparent, ${GOLD})` }} />
+      <span style={{ color: GOLD, fontSize: 9 }}>◆</span>
+      <div style={{ width: 34, height: 1, background: `linear-gradient(90deg, ${GOLD}, transparent)` }} />
+      <span style={{ color: GOLD, fontSize: 11 }}>❖</span>
+    </div>
   );
 
   return (
     <div style={{
-      width: isMobile ? 300 : 340,
-      borderRadius: 14,
-      boxShadow: '0 14px 36px rgba(0,0,0,0.30)',
+      width: isMobile ? 330 : 388,
+      borderRadius: 16,
+      boxShadow: '0 18px 44px rgba(74,58,31,0.28)',
       fontFamily: SF,
       position: 'relative',
       overflow: 'hidden',
-      color: '#fff',
+      color: INK,
+      border: `1px solid ${GOLD_SOFT}`,
+      background: 'linear-gradient(170deg, #fdf9f0 0%, #f8efdb 55%, #f3e7cd 100%)',
     }}>
-      {/* Dark gold bokeh backdrop */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: `radial-gradient(circle at 20% 15%, rgba(212,175,55,0.25), transparent 45%),
-                     radial-gradient(circle at 80% 75%, rgba(212,175,55,0.18), transparent 50%),
-                     linear-gradient(160deg, #201610 0%, #140c08 55%, #0c0704 100%)`,
-        zIndex: 0,
-      }} />
-
-      <div style={{ position: 'relative', zIndex: 1, padding: isMobile ? '20px 18px' : '24px 22px' }}>
+      <div style={{ position: 'relative', zIndex: 1, padding: isMobile ? '12px 14px' : '14px 18px' }}>
         {/* Logo */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-          <img src={tamiriLogo} alt="TAMIRI JEWELLERS PVT LTD" style={{ maxWidth: 130, height: 'auto' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 2 }}>
+          <img src={tamiriLogo} alt="TAMIRI JEWELLERS PVT LTD" style={{ maxWidth: 118, height: 'auto' }} />
         </div>
 
         {/* Title */}
         <h2 style={{
-          fontSize: isMobile ? 20 : 22,
-          fontWeight: 600,
-          margin: '4px 0 0',
+          fontSize: isMobile ? 16 : 18,
+          fontWeight: 700,
+          margin: 0,
           textAlign: 'center',
           fontFamily: "'Times New Roman', Times, serif",
-          letterSpacing: 0.3,
-          color: '#fff',
+          letterSpacing: 1.4,
+          color: INK,
+          textTransform: 'uppercase',
         }}>
           Today's Gold Rate
         </h2>
 
-        {/* Diamond ornament divider */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, margin: '10px 0 18px' }}>
-          <div style={{ width: 46, height: 1, background: '#d4af37' }} />
-          <div style={{ width: 8, height: 8, background: '#d4af37', transform: 'rotate(45deg)' }} />
-          <div style={{ width: 46, height: 1, background: '#d4af37' }} />
-        </div>
-        {/* e8d9a8 */}
+        <Flourish />
+
         {/* Rate rows */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#d4af37' }}>Loading rates…</div>
+          <div style={{ textAlign: 'center', padding: '20px', color: GOLD }}>Loading rates…</div>
         ) : (
           rows.map((row, i) => (
-            <div key={i} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: '#fff', padding: '0 8px 4px' }}>
-                <span>{row.karat}</span>
-                <span>–</span>
-                <span>{row.tax}</span>
+            <div key={i} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '5px 11px',
+              marginBottom: 6,
+              borderRadius: 10,
+              border: `1px solid ${GOLD_SOFT}`,
+              background: 'linear-gradient(180deg, #ffffff 0%, #fbf4e4 100%)',
+              boxShadow: '0 2px 6px rgba(74,58,31,0.06)',
+            }}>
+              {/* KTS badge */}
+              <div style={{ textAlign: 'center', minWidth: 44 }}>
+                <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, color: INK, fontFamily: "'Times New Roman', Times, serif" }}>{row.kt}</div>
+                <div style={{ fontSize: 9.5, fontWeight: 600, color: INK, letterSpacing: 0.5 }}>KTS</div>
+                <div style={{ fontSize: 8.5, color: MUTED }}>{row.fine}</div>
               </div>
-              <div style={{
-                border: '1px solid #fff',
-                borderRadius: 999,
-                padding: '7px 16px',
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
-                gap: 10,
-                background: 'rgba(255,255,255,0.03)',
-              }}>
-                <span style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, fontFamily: "'Times New Roman', Times, serif" }}>
-                  {row.price}/-
-                </span>
-                <span style={{ fontSize: 12, color: '#fff' }}>{row.unit}</span>
+
+              <div style={{ width: 1, alignSelf: 'stretch', background: GOLD_SOFT }} />
+
+              {/* Tax + price + unit */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, color: MUTED, marginBottom: 1 }}>{row.tax}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: isMobile ? 14 : 15.5, fontWeight: 700, color: GOLD, fontFamily: "'Times New Roman', Times, serif" }}>₹{row.price}/-</span>
+                  <span style={{ fontSize: 9.5, color: MUTED }}>{row.unit}</span>
+                </div>
               </div>
+
+              {/* Icon */}
+              <div style={{ flexShrink: 0 }}><RowIcon type={row.icon} /></div>
             </div>
           ))
         )}
 
-        {/* Phone */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18, padding: '0 4px' }}>
-          <PhoneIcon />
-          <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: 1.5 }}>+91 86625 76870</span>
+        {/* Price dip alert + check price */}
+        <div style={{
+          marginTop: 9, padding: '8px 11px', borderRadius: 10,
+          border: `1px solid ${GOLD_SOFT}`, background: 'rgba(255,255,255,0.55)',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={GOLD} style={{ flexShrink: 0 }}>
+            <path d="M12 2a6 6 0 0 0-6 6c0 4-1.5 5.5-2 6.5h16c-.5-1-2-2.5-2-6.5a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0z" />
+          </svg>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, letterSpacing: 0.3 }}>PRICE DIP ALERT</div>
+            <div style={{ fontSize: 10.5, color: MUTED }}>Gold just pulled back</div>
+          </div>
+          {/* CHECK PRICE button with the phone number directly under it */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+            <a href="tel:+918662576870" style={{
+              display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none',
+              padding: '6px 12px', borderRadius: 999, whiteSpace: 'nowrap',
+              background: `linear-gradient(180deg, #d9b65a 0%, ${GOLD} 100%)`,
+              color: '#fff', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 6px rgba(184,144,47,0.4)',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+              CHECK PRICE
+            </a>
+            <span style={{ fontSize: 11, fontWeight: 700, color: INK, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>+91 86625 76870</span>
+          </div>
         </div>
 
         {/* Address */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 10, padding: '0 4px' }}>
-          <div style={{ marginTop: 3 }}><PinIcon /></div>
-          <span style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.5 }}>
-            Rajagopalachari Street, Governorpet, Vijayawada , 520002
-          </span>
-        </div>
-
-        {/* Fine print */}
-        <div style={{ textAlign: 'center', fontSize: 10, color: '#fff', marginTop: 14, letterSpacing: 0.4 }}>
-          (SRI SK JEWELS - A UNIT OF TAMIRI JEWELLERS PVT LTD)
+        <div style={{
+          marginTop: 9, padding: '8px 11px', borderRadius: 10,
+          border: `1px solid ${GOLD_SOFT}`, background: 'rgba(255,255,255,0.55)', textAlign: 'center',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: INK, fontSize: 11.5, lineHeight: 1.5 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+            </svg>
+            <span>Rajagopalachari Street, Governorpet, Vijayawada-520002</span>
+          </div>
+          <div style={{ fontSize: 10, color: MUTED, marginTop: 6, letterSpacing: 0.3 }}>
+            (SRI SK JEWELS – A UNIT OF TAMIRI JEWELLERS PVT LTD)
+          </div>
         </div>
       </div>
     </div>

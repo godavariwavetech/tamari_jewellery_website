@@ -581,7 +581,7 @@ function Sidebar({
    PRODUCT CARD
 ════════════════════════ */
 const COLOR_SWATCHES: { key: string; label: string; hex: string; ring: string; match: (c: string) => boolean }[] = [
-  { key: "rose", label: "Rose Gold", hex: "#E8B4B4", ring: "#f5d5d5", match: c => c.includes("rose") || c.includes("pink") },
+  { key: "rose", label: "Rose Gold", hex: "#E0B0A0", ring: "#f0d5cc", match: c => c.includes("rose") || c.includes("pink") },
   { key: "white", label: "White Gold", hex: "#D9D9D9", ring: "#ececec", match: c => c.includes("white") },
   { key: "yellow", label: "Yellow Gold", hex: "#E4AC14", ring: "#f4dc8f", match: c => c.includes("yellow") },
 ];
