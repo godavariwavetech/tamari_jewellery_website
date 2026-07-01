@@ -36,11 +36,12 @@ export interface CategoryWithSubcategories {
 }
 
 export interface Product {
-  id: number;
+  id: number | string;
   product_name: string;
   product_image: string;
   product_image_hover?: string;
   price: number;
+  is_combo?: boolean;
   total_price?: number; // Add this optional field
   actual_price?: number; // MRP from z_all_products — when > total_price, render as strikethrough
   selling_price?: number;
@@ -110,6 +111,22 @@ export interface ProductDetail extends Product {
   gst_percentage?: number;
   gst_amount?: number;
   price_breakdown?: Array<{ label: string; amount: number }>; // pre-built rows for UI
+}
+
+export interface ComboProduct {
+  id: number;
+  combo_name: string;
+  combo_sku_id: string;
+  combo_gender: string;
+  combo_occasion: string;
+  combo_description: string;
+  combo_b2b_va: number;
+  combo_b2c_va: number;
+  combo_main_image: string;
+  combo_side_images: string[];
+  combo_video: string | null;
+  combo_items: ProductDetail[];
+  combo_total_price?: number;
 }
 
 export interface Banner {
@@ -727,6 +744,27 @@ export const apiService = {
     } catch (error) {
       console.error('Failed to fetch product details:', error);
       throw error;
+    }
+  },
+
+  async getComboProducts(): Promise<ComboProduct[]> {
+    try {
+      const response = await fetch(`${BASE_URL}/getcomboproducts`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.data || [];
+    } catch (error) {
+      console.warn('Failed to fetch combo products:', error);
+      return [];
     }
   },
 

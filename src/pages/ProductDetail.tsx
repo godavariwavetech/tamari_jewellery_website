@@ -106,6 +106,8 @@ export default function ProductDetail() {
   const [cartMsg, setCartMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [isCombo, setIsCombo] = useState(false);
+  const [comboData, setComboData] = useState<any>(null);
 
   useEffect(() => {
     if (!product?.id) return;
@@ -116,7 +118,7 @@ export default function ProductDetail() {
         return;
       }
       const map = await getWishlistProductMap();
-      if (!cancelled) setInWishlist(map.has(product.id));
+      if (!cancelled) setInWishlist(map.has(Number(product.id)));
     };
     sync();
     const refresh = () => sync();
@@ -136,7 +138,7 @@ export default function ProductDetail() {
     setWishlistBusy(true);
     const previous = inWishlist;
     setInWishlist(!previous);
-    const res = await toggleWishlistWithUpdate(product.id);
+    const res = await toggleWishlistWithUpdate(Number(product.id));
     if (!res.success) {
       setInWishlist(previous);
       setCartMsg({ text: res.message || 'Failed to update wishlist', kind: 'err' });
@@ -155,7 +157,7 @@ export default function ProductDetail() {
     setCartBusy(true);
     setCartMsg(null);
     try {
-      const res = await apiService.addToCart(user.id, product.id, 1, 0, user.role);
+      const res = await apiService.addToCart(user.id, Number(product.id), 1, 0, user.role);
       if (res.success) {
         dispatchCartUpdate();
         setCartMsg({ text: 'Added to cart', kind: 'ok' });
@@ -177,7 +179,7 @@ export default function ProductDetail() {
       navigate('/login');
       return;
     }
-    const res = await apiService.addToCart(user.id, product.id, 1, 0, user.role);
+    const res = await apiService.addToCart(user.id, Number(product.id), 1, 0, user.role);
     if (res.success || res.alreadyExists) {
       dispatchCartUpdate();
       navigate('/cart');
@@ -193,8 +195,14 @@ export default function ProductDetail() {
   const [bgPos, setBgPos] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Get product images or fallback to default thumbnails
-  const productImages = product?.product_images?.length ? product.product_images : THUMBS;
+  // Get product images and video or fallback to default thumbnails
+  const mediaItems = useMemo(() => {
+    const items: { type: 'image' | 'video', url: string }[] = [];
+    const images = product?.product_images?.length ? product.product_images : THUMBS;
+    images.forEach((img: string) => items.push({ type: 'image', url: img }));
+    if ((product as any)?.product_video) items.push({ type: 'video', url: (product as any).product_video });
+    return items;
+  }, [product]);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -208,48 +216,85 @@ export default function ProductDetail() {
       
       try {
         setLoading(true);
-        const productId = parseInt(id, 10);
-        if (isNaN(productId)) {
+        let parsedId = parseInt(id, 10);
+        let comboFlag = false;
+        
+        if (id.startsWith('combo-')) {
+          comboFlag = true;
+          parsedId = parseInt(id.replace('combo-', ''), 10);
+          setIsCombo(true);
+        }
+
+        if (isNaN(parsedId)) {
           setError('Invalid product ID');
           return;
         }
-        
-        const [productData, categoryProducts, reviewsData] = await Promise.all([
-          apiService.getProductDetails(productId),
-          // Get products from the same category for "You May Also Like"
-          apiService.getProducts().then(result => result.products),
-          apiService.getProductReviews(productId)
-        ]);
-        
-        setProduct(productData);
-        
-        // Filter products from the same category, excluding current product
-        const sameCategoryProducts = categoryProducts
-          .filter(p => p.category_id === productData.category_id && p.id !== productId)
-          .slice(0, 4);
-        
-        setRelatedProducts(sameCategoryProducts);
-        setReviews(reviewsData);
-        
-        // Set initial color based on product material color
-        if (productData.material_color) {
-          const mColor = productData.material_color.toLowerCase();
-          if (mColor.includes("yellow")) setColor("Yellow Gold");
-          else if (mColor.includes("pink") || mColor.includes("rose")) setColor("Rose Gold");
-          else if (mColor.includes("white")) setColor("White Gold");
-        }
 
-        // Default the purity selector to the product's actual karat — otherwise the
-        // first render shows "18KT" selected even when the stored prices are for 22KT.
-        if (productData.karat) {
-          const firstKarat = String(productData.karat).split(',')[0].trim();
-          setPurity(`${firstKarat}KT`);
-        }
+        if (comboFlag) {
+          const comboProducts = await apiService.getComboProducts();
+          const combo = comboProducts.find(c => c.id === parsedId);
+          if (!combo) {
+            setError('Combo product not found');
+            return;
+          }
+          
+          setComboData(combo);
+          
+          // Map to ProductDetail to reuse UI
+          const mappedProduct: any = {
+            id: combo.id,
+            product_name: combo.combo_name,
+            description: combo.combo_description,
+            product_images: [combo.combo_main_image, ...(combo.combo_side_images || [])],
+            product_video: (combo as any).product_video || combo.combo_video,
+            category_name: "Combo Set",
+            gender: combo.combo_gender,
+            occasion: combo.combo_occasion,
+            sku_id: combo.combo_sku_id,
+            is_combo: true
+          };
+          
+          setProduct(mappedProduct);
+          setTab("combo items");
+          
+        } else {
+          const [productData, categoryProducts, reviewsData] = await Promise.all([
+            apiService.getProductDetails(parsedId),
+            // Get products from the same category for "You May Also Like"
+            apiService.getProducts().then(result => result.products),
+            apiService.getProductReviews(parsedId)
+          ]);
+          
+          setProduct(productData);
+          
+          // Filter products from the same category, excluding current product
+          const sameCategoryProducts = categoryProducts
+            .filter(p => p.category_id === productData.category_id && p.id !== parsedId)
+            .slice(0, 4);
+          
+          setRelatedProducts(sameCategoryProducts);
+          setReviews(reviewsData);
+          
+          // Set initial color based on product material color
+          if (productData.material_color) {
+            const mColor = productData.material_color.toLowerCase();
+            if (mColor.includes("yellow")) setColor("Yellow Gold");
+            else if (mColor.includes("pink") || mColor.includes("rose")) setColor("Rose Gold");
+            else if (mColor.includes("white")) setColor("White Gold");
+          }
 
-        // Default the size selector to the first size returned from the variant_sizes
-        // table. Hardcoded "14 (54.40 mm)" is wrong for non-ring products.
-        if (productData.has_sizes === 1 && productData.sizes && productData.sizes.length > 0) {
-          setSize(productData.sizes[0].size);
+          // Default the purity selector to the product's actual karat — otherwise the
+          // first render shows "18KT" selected even when the stored prices are for 22KT.
+          if (productData.karat) {
+            const firstKarat = String(productData.karat).split(',')[0].trim();
+            setPurity(`${firstKarat}KT`);
+          }
+
+          // Default the size selector to the first size returned from the variant_sizes
+          // table. Hardcoded "14 (54.40 mm)" is wrong for non-ring products.
+          if (productData.has_sizes === 1 && productData.sizes && productData.sizes.length > 0) {
+            setSize(productData.sizes[0].size);
+          }
         }
       } catch (err) {
         setError('Failed to load product details');
@@ -316,13 +361,148 @@ export default function ProductDetail() {
     PURITY_MAP[karat] !== undefined ? PURITY_MAP[karat] : karat / 24;
 
   const availableKarats = useMemo(() => {
+    const parseKarat = (v: string) => {
+      const num = v.match(/\d+/);
+      return num ? `${num[0]}KT` : `${v}KT`;
+    };
+
+    if (isCombo && comboData) {
+      const karats = new Set<string>();
+      comboData.combo_items?.forEach((item: any) => {
+        if (item.karat) {
+          String(item.karat).split(',').map(v => v.trim()).filter(v => v).forEach(k => karats.add(parseKarat(k)));
+        }
+      });
+      if (karats.size > 0) return Array.from(karats);
+      return ["18KT", "22KT"];
+    }
+
     if (!product?.karat) return ["18KT", "22KT"];
     const k = String(product.karat).split(',').map(v => v.trim()).filter(v => v);
     if (k.length === 0) return ["18KT", "22KT"];
-    return k.map(v => `${v}KT`);
-  }, [product?.karat]);
+    return k.map(v => parseKarat(v));
+  }, [product?.karat, isCombo, comboData]);
 
-  const breakup = useMemo<{ rows: BreakupRow[]; subTotal: number; gstAmount: number; gstLabel: string; total: number } | null>(() => {
+  const breakup = useMemo<{ rows: BreakupRow[]; subTotal: number; gstAmount: number; gstLabel: string; total: number; comboItems?: any[] } | null>(() => {
+    if (isCombo && comboData) {
+      let grandOverall = 0;
+      let grandGst = 0;
+      let grandSubTotal = 0;
+      const comboItemsBreakup: any[] = [];
+      const selectedKarat = parseInt(purity, 10) || 0;
+
+      comboData.combo_items?.forEach((item: any) => {
+        const safeNum = (v: any) => {
+          if (!v) return 0;
+          if (typeof v === 'string') {
+            const match = v.match(/[-+]?[0-9]*\.?[0-9]+/);
+            return match ? Number(match[0]) : 0;
+          }
+          return Number(v) || 0;
+        };
+
+        const itemKaratValue = safeNum(String(item.karat || "").split(',')[0]);
+        const useKarat = selectedKarat || itemKaratValue || 0;
+        const sameKarat = useKarat === itemKaratValue;
+        const isGold = (item.metal_name || item.material_color || "gold").toLowerCase().includes("gold");
+
+        let mVal = 0, mkVal = 0, dVal = 0, sVal = 0, cVal = 0, gstAmt = 0, sTotal = 0, itemOverall = 0;
+        let gstPercent = 0;
+        let karatRate = 0;
+        let vaPct = 0;
+
+        if (sameKarat) {
+          mVal = Number(item.metal_value || 0);
+          mkVal = Number(item.making_value ?? item.makingcharges ?? 0);
+          dVal = item.has_diamond === 1 ? Number(item.diamond_value || 0) : 0;
+          sVal = item.has_stone === 1 ? Number(item.stone_value || 0) : 0;
+          cVal = item.has_diamond === 1 ? Number(item.certificate_value || 0) : 0;
+          gstAmt = Number(item.gst_amount || 0);
+          itemOverall = Number(item.total_price ?? 0);
+          gstPercent = Number(item.gst_percentage || 0);
+          sTotal = mVal + mkVal + dVal + sVal + cVal;
+          karatRate = Number(item.karat_rate || 0);
+          vaPct = Number(item.va_percentage || 0);
+        } else {
+          const netWt = safeNum(item.net_weight);
+          vaPct = safeNum(item.va_percentage || item.b2c_va_percentage);
+          const makingPerGram = safeNum(item.making_charges);
+          const rate24k = safeNum(item.rate_per_gram);
+
+          if (isGold) {
+            const purityFrac = purityFactor(useKarat);
+            karatRate = rate24k * purityFrac + GOLD_KARAT_PREMIUM_PER_GRAM;
+            const finalGoldWt = purityFrac > 0 ? netWt * (purityFrac + vaPct / 100) / purityFrac : 0;
+            mVal = finalGoldWt * karatRate;
+          } else {
+            mVal = netWt * rate24k;
+          }
+
+          const makingWt = netWt * (1 + vaPct / 100);
+          mkVal = makingWt * makingPerGram;
+
+          const diamondCt = Array.isArray(item.diamond_details) 
+            ? item.diamond_details.reduce((sum: number, d: any) => sum + Number(String(d?.diamond_weight || 0).match(/[-+]?[0-9]*\.?[0-9]+/)?.[0] || 0), 0)
+            : safeNum(item.diamond_weight);
+          dVal = item.has_diamond === 1 ? Number(item.diamond_value || 0) : 0;
+          sVal = item.has_stone === 1 ? Number(item.stone_value || 0) : 0;
+          cVal = item.has_diamond === 1 ? diamondCt * CERTIFICATE_RATE_PER_CT : 0;
+
+          sTotal = mVal + mkVal + dVal + sVal + cVal;
+          gstPercent = safeNum(item.gst_percentage);
+          gstAmt = sTotal * (gstPercent / 100);
+          itemOverall = sTotal + gstAmt;
+        }
+
+        const itemName = item.product_name || "Item";
+        
+        const metalLabel = (item.metal_name || "Metal") + 
+          (useKarat ? ` ${useKarat}KT` : "") + 
+          (item.net_weight ? ` Nt Wt: ${item.net_weight} g` : "") +
+          (isGold ? (karatRate > 0 ? ` @ ₹${Math.round(karatRate).toLocaleString("en-IN")}/g` : "") + (vaPct > 0 ? ` + ${vaPct}% VA` : "") : "");
+          
+        const parsedDiamondCt = Array.isArray(item.diamond_details) 
+          ? item.diamond_details.reduce((sum: number, d: any) => sum + Number(String(d?.diamond_weight || 0).match(/[-+]?[0-9]*\.?[0-9]+/)?.[0] || 0), 0)
+          : Number(String(item.diamond_weight || 0).match(/[-+]?[0-9]*\.?[0-9]+/)?.[0] || 0);
+        const diamondLabel = parsedDiamondCt > 0 ? `Diamond Wt: ${parsedDiamondCt} ct` : "Diamond";
+        
+        const stoneCt = Array.isArray(item.stone_details)
+          ? item.stone_details.reduce((sum: number, s: any) => sum + Number(String(s?.stone_weight || 0).match(/[-+]?[0-9]*\.?[0-9]+/)?.[0] || 0), 0)
+          : 0;
+        const stoneLabel = stoneCt > 0 ? `Stone Wt: ${stoneCt} ct` : "Stone";
+        const gstLabel = `GST (${gstPercent}%)`;
+
+        const rows: BreakupRow[] = [];
+        if (mVal > 0) rows.push({ label: metalLabel, amount: mVal });
+        if (dVal > 0) rows.push({ label: diamondLabel, amount: dVal });
+        if (sVal > 0) rows.push({ label: stoneLabel, amount: sVal });
+        rows.push({ label: "Making Charge", amount: mkVal });
+        if (cVal > 0) rows.push({ label: "Certification Charges", amount: cVal });
+
+        comboItemsBreakup.push({
+          name: itemName,
+          rows,
+          subTotal: sTotal,
+          gstAmount: gstAmt,
+          gstLabel,
+          total: itemOverall
+        });
+
+        grandSubTotal += sTotal;
+        grandGst += gstAmt;
+        grandOverall += itemOverall;
+      });
+
+      return { 
+        rows: [], 
+        subTotal: grandSubTotal, 
+        gstAmount: grandGst, 
+        gstLabel: "Total GST", 
+        total: grandOverall,
+        comboItems: comboItemsBreakup 
+      };
+    }
+
     if (!product) return null;
 
     const productKaratValue = parseInt(String(product.karat || "").split(',')[0].trim(), 10) || 0;
@@ -335,10 +515,14 @@ export default function ProductDetail() {
     const metalLabel = product.metal_name
       ? `${product.metal_name}${selectedKarat ? ` ${selectedKarat}KT` : ""}${product.net_weight ? ` Nt Wt: ${product.net_weight} g` : ""}`
       : "Metal";
-    const diamondLabel = product.diamond_weight ? `Diamond Wt: ${product.diamond_weight} ct` : "Diamond";
+    const parsedDiamondCt = Array.isArray(product.daimond_details) 
+      ? product.daimond_details.reduce((sum: number, d: any) => sum + Number(String(d?.diamond_weight || 0).match(/[-+]?[0-9]*\.?[0-9]+/)?.[0] || 0), 0)
+      : Number(String(product.diamond_weight || 0).match(/[-+]?[0-9]*\.?[0-9]+/)?.[0] || 0);
+    const diamondLabel = parsedDiamondCt > 0 ? `Diamond Wt: ${parsedDiamondCt} ct` : "Diamond";
+    
     // Stone weight = sum of stone_weight across the stone_details rows.
     const stoneCt = Array.isArray(product.stone_details)
-      ? product.stone_details.reduce((sum: number, s: any) => sum + Number(s?.stone_weight || 0), 0)
+      ? product.stone_details.reduce((sum: number, s: any) => sum + Number(String(s?.stone_weight || 0).match(/[-+]?[0-9]*\.?[0-9]+/)?.[0] || 0), 0)
       : 0;
     const stoneLabel = stoneCt > 0 ? `Stone Wt: ${stoneCt} ct` : "Stone";
     const gstLabel = product.gst_percentage != null ? `GST (${product.gst_percentage}%)` : "GST";
@@ -499,110 +683,117 @@ export default function ProductDetail() {
               {/* Main image */}
               <div 
                 ref={containerRef}
-                onMouseEnter={() => !isMobile && setShowZoom(true)}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={() => setShowZoom(false)}
                 style={{
                   position: "relative", background: "#f0f0f0",
                   borderRadius: 16, overflow: "visible", // Allow zoom box to overflow
                   aspectRatio: "1/1", marginBottom: 16,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: !isMobile ? "crosshair" : "default",
+                  display: "flex", alignItems: "center", justifyContent: "center"
                 }}
               >
-                {/* Wrapper to clip lens but allow zoom box overflow */}
-                <div style={{ 
-                  position: 'absolute', 
-                  inset: 0, 
-                  overflow: 'hidden', 
-                  borderRadius: 16,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {/* Nav arrows */}
-                  <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i - 1 + productImages.length) % productImages.length); }} style={{
-                    position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
-                    width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.9)",
-                    border: "1px solid #e5e7eb", display: "flex", alignItems: "center",
-                    justifyContent: "center", cursor: "pointer", zIndex: 2,
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                <div 
+                  style={{ width: "100%", height: "100%", cursor: mediaItems[activeImg]?.type === 'video' ? "default" : "crosshair" }}
+                  onMouseMove={mediaItems[activeImg]?.type === 'image' ? handleMouseMove : undefined}
+                  onMouseEnter={() => { if (!isMobile && mediaItems[activeImg]?.type === 'image') setShowZoom(true); }}
+                  onMouseLeave={() => { setShowZoom(false); }}
+                >
+                  {/* Wrapper to clip lens but allow zoom box overflow */}
+                  <div style={{ 
+                    position: 'absolute', 
+                    inset: 0, 
+                    overflow: 'hidden', 
+                    borderRadius: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}>
-                    <ChevLeft />
-                  </button>
-                  <img src={productImages[activeImg]} alt="Product" style={{ width: "100%", height: "100%", objectFit: "cover", userSelect: "none" }} />
-                  <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i + 1) % productImages.length); }} style={{
-                    position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-                    width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.9)",
-                    border: "1px solid #e5e7eb", display: "flex", alignItems: "center",
-                    justifyContent: "center", cursor: "pointer", zIndex: 2,
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                  }}>
-                    <ChevRight />
-                  </button>
+                    {/* Nav arrows */}
+                    <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i - 1 + mediaItems.length) % mediaItems.length); }} style={{
+                      position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+                      width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.9)",
+                      border: "1px solid #e5e7eb", display: "flex", alignItems: "center",
+                      justifyContent: "center", cursor: "pointer", zIndex: 2,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                    }}>
+                      <ChevLeft />
+                    </button>
+                    {mediaItems[activeImg]?.type === 'video' ? (
+                      <video src={mediaItems[activeImg].url} controls autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <img src={mediaItems[activeImg]?.url} alt="Product" style={{ width: "100%", height: "100%", objectFit: "cover", userSelect: "none" }} />
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i + 1) % mediaItems.length); }} style={{
+                      position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                      width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.9)",
+                      border: "1px solid #e5e7eb", display: "flex", alignItems: "center",
+                      justifyContent: "center", cursor: "pointer", zIndex: 2,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                    }}>
+                      <ChevRight />
+                    </button>
 
-                  {/* Lens */}
-                  {showZoom && !isMobile && (
+                    {/* Lens */}
+                    {showZoom && !isMobile && mediaItems[activeImg]?.type === 'image' && (
+                      <div style={{
+                        position: "absolute",
+                        left: lensPos.x,
+                        top: lensPos.y,
+                        width: 180,
+                        height: 180,
+                        border: "1px solid #7c2d12",
+                        backgroundColor: "rgba(0, 0, 0, 0.05)",
+                        pointerEvents: "none",
+                        zIndex: 1,
+                      }} />
+                    )}
+                  </div>
+
+                  {/* Zoom Box (Overlay next to image) */}
+                  {showZoom && !isMobile && mediaItems[activeImg]?.type === 'image' && (
                     <div style={{
                       position: "absolute",
-                      left: lensPos.x,
-                      top: lensPos.y,
-                      width: 180,
-                      height: 180,
-                      border: "1px solid #7c2d12",
-                      backgroundColor: "rgba(0, 0, 0, 0.05)",
-                      pointerEvents: "none",
-                      zIndex: 1,
-                    }} />
-                  )}
-                </div>
-
-                {/* Zoom Box (Overlay next to image) */}
-                {showZoom && !isMobile && (
-                  <div style={{
-                    position: "absolute",
-                    left: "calc(100% + 24px)",
-                    top: 0,
-                    width: "100%",
-                    height: "100%",
-                    background: "#fff",
-                    boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
-                    borderRadius: 16,
-                    zIndex: 100,
-                    overflow: "hidden",
-                    border: "1px solid #e5e7eb",
-                    pointerEvents: "none",
-                  }}>
-                    <div style={{
+                      left: "calc(100% + 24px)",
+                      top: 0,
                       width: "100%",
                       height: "100%",
-                      backgroundImage: `url(${productImages[activeImg]})`,
-                      backgroundPosition: `${bgPos.x}% ${bgPos.y}%`,
-                      backgroundRepeat: "no-repeat",
-                      backgroundSize: "250%",
-                    }} />
-                    <div style={{
-                      position: "absolute",
-                      bottom: 12,
-                      left: 12,
-                      background: "rgba(124, 45, 18, 0.9)",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      padding: "5px 10px",
-                      borderRadius: 4,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
+                      background: "#fff",
+                      boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+                      borderRadius: 16,
+                      zIndex: 100,
+                      overflow: "hidden",
+                      border: "1px solid #e5e7eb",
+                      pointerEvents: "none",
                     }}>
-                      HIGH PRECISION INSPECTION
+                      <div style={{
+                        width: "100%",
+                        height: "100%",
+                        backgroundImage: `url(${mediaItems[activeImg]?.url})`,
+                        backgroundPosition: `${bgPos.x}% ${bgPos.y}%`,
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: "250%",
+                      }} />
+                      <div style={{
+                        position: "absolute",
+                        bottom: 12,
+                        left: 12,
+                        background: "rgba(124, 45, 18, 0.9)",
+                        color: "#fff",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        padding: "5px 10px",
+                        borderRadius: 4,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}>
+                        HIGH PRECISION INSPECTION
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Thumbnails row */}
               <div style={{ display: "flex", gap: 10, alignItems: "center", overflowX: 'auto', paddingBottom: 4 }}>
-                {productImages.map((t, i) => (
+                {mediaItems.map((item, i) => (
                   <div key={i} onClick={() => setActiveImg(i)} style={{
                     flex: isMobile ? '0 0 70px' : 1, aspectRatio: "1/1",
                     borderRadius: 10, background: "#f0f0f0",
@@ -611,8 +802,20 @@ export default function ProductDetail() {
                     cursor: "pointer",
                     transition: "border-color 0.15s",
                     overflow: "hidden",
+                    position: "relative"
                   }}>
-                    <img src={t} alt={`Thumbnail ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {item.type === 'video' ? (
+                      <>
+                        <video src={item.url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.2)" }}>
+                           <div style={{ background: "rgba(255,255,255,0.8)", borderRadius: "50%", padding: 6, display: "flex" }}>
+                             <svg width="18" height="18" viewBox="0 0 24 24" fill="#111"><path d="M8 5v14l11-7z"/></svg>
+                           </div>
+                        </div>
+                      </>
+                    ) : (
+                      <img src={item.url} alt={`Thumbnail ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -620,6 +823,19 @@ export default function ProductDetail() {
               {/* Tabs */}
               <div style={{ marginTop: 28 }}>
                 <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb", marginBottom: 20, overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none' }}>
+                  {isCombo && (
+                    <button onClick={() => setTab("combo items")} style={{
+                      padding: "10px 0", marginRight: 28,
+                      background: "none", border: "none", cursor: "pointer",
+                      fontSize: 13, fontWeight: 700, textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                      color: tab === "combo items" ? "#111827" : "#9ca3af",
+                      borderBottom: tab === "combo items" ? `2.5px solid #111827` : "2.5px solid transparent",
+                      transition: "color 0.15s",
+                    }}>
+                      Combo Items
+                    </button>
+                  )}
                   {["description", "product detail", "reviews"].map(t => (
                     <button key={t} onClick={() => setTab(t)} style={{
                       padding: "10px 0", marginRight: 28,
@@ -640,6 +856,33 @@ export default function ProductDetail() {
                     <p style={{ margin: "0 0 14px" }}>
                       {product?.description || "No description available for this product."}
                     </p>
+                  </div>
+                ) : tab === "combo items" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {comboData?.combo_items && comboData.combo_items.map((item: any, idx: number) => (
+                      <div key={idx} style={{ display: "flex", gap: 16, border: "1px solid #e5e7eb", padding: 16, borderRadius: 12, background: "#fff" }}>
+                        <div style={{ width: 100, height: 100, flexShrink: 0, borderRadius: 8, overflow: "hidden", background: "#f9fafb" }}>
+                          <img src={item.images?.[0] || productImg} alt={item.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 600, color: "#111827", textTransform: "capitalize" }}>{item.product_name}</h4>
+                          <p style={{ margin: "0 0 8px", fontSize: 12, color: "#6b7280" }}>SKU: {item.sku_id}</p>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px", fontSize: 13, color: "#4b5563", alignItems: "center" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <strong>Metal:</strong> <span style={{textTransform: 'capitalize'}}>{item.material_color}</span>
+                              {item.karat && (
+                                <span style={{ background: GOLD, color: "#fff", padding: "2px 6px", borderRadius: 4, fontWeight: 600, fontSize: 11 }}>
+                                  {item.karat.toString().match(/\d+/)?.[0]}KT
+                                </span>
+                              )}
+                            </div>
+                            <div><strong>Gross Wt:</strong> {item.gross_weight ? `${item.gross_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} g` : ""}</div>
+                            {item.has_diamond === 1 && <div><strong>Diamond:</strong> {item.diamond_details?.[0]?.diamond_weight ? `${item.diamond_details[0].diamond_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} ct` : ""}</div>}
+                            {item.has_stone === 1 && <div><strong>Stone:</strong> {item.stone_details?.[0]?.stone_weight ? `${item.stone_details[0].stone_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} ct` : ""}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : tab === "product detail" ? (() => {
                   // Each spec row only renders when the underlying field has a real value.
@@ -683,17 +926,80 @@ export default function ProductDetail() {
                     { label: "Occasion", value: product?.occasion },
                   ];
 
+                  if (isCombo && comboData) {
+                    return (
+                      <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.75 }}>
+                        {renderSection("📋", "General Information", generalRows)}
+                        {comboData.combo_items?.map((item: any, idx: number) => {
+                          const metalRows: Row[] = [
+                            { label: "Metal Type", value: item?.metal_name },
+                            { label: "Purity", value: item?.karat ? `${item.karat.toString().match(/\d+/)?.[0]}KT` : undefined },
+                            { label: "Gross Weight", value: item?.gross_weight ? `${item.gross_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} g` : undefined },
+                            { label: "Net Weight", value: item?.net_weight ? `${item.net_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} g` : undefined },
+                            { label: "Metal Colour", value: item?.material_color },
+                          ];
+
+                          const hasDiamondData = item?.has_diamond === 1;
+                          const diamondRows: Row[] = hasDiamondData ? [
+                            { label: "Diamond Weight", value: item?.diamond_weight ? `${item.diamond_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} ct` : undefined },
+                            { label: "Diamond Pieces", value: item?.no_of_diamonds ? `${item.no_of_diamonds} pcs`: undefined },
+                            { label: "Diamond Quality", value: item?.diamond_clarity },
+                            { label: "Diamond Colour", value: item?.diamond_color },
+                            { label: "Diamond Shape", value: item?.diamond_shape },
+                            { label: "Diamond Setting", value: item?.diamond_setting },
+                          ] : [];
+
+                          let stoneDetails: any[] = [];
+                          if (Array.isArray(item?.stone_details)) {
+                            stoneDetails = item.stone_details;
+                          } else if (typeof item?.stone_details === 'string') {
+                            try { stoneDetails = JSON.parse(item.stone_details); } catch (e) {}
+                            if (!Array.isArray(stoneDetails)) stoneDetails = [];
+                          }
+
+                          const hasStoneData = item?.has_stone === 1 && stoneDetails.length > 0;
+                          const stoneRows: Row[] = hasStoneData
+                            ? stoneDetails.flatMap((s: any, i: number) => {
+                                const indexLabel = stoneDetails.length > 1 ? ` ${i + 1}` : "";
+                                return [
+                                  { label: `Stone${indexLabel} Name`, value: s.stone_name },
+                                  { label: `Stone${indexLabel} Weight`, value: s.stone_weight ? `${s.stone_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} ct` : undefined },
+                                ] as Row[];
+                              })
+                            : [];
+
+                          return (
+                            <div key={idx} style={{ marginTop: 24 }}>
+                              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 16, paddingBottom: 8, borderBottom: "2px solid #f3f4f6", textTransform: "capitalize" }}>
+                                {item.product_name || `Item ${idx + 1}`}
+                              </h3>
+                              {renderSection("🔶", "Metal Information", metalRows)}
+                              {renderSection("💎", "Diamond Information", diamondRows)}
+                              {renderSection("🔷", "Stone Information", stoneRows)}
+                            </div>
+                          );
+                        })}
+                        <div style={{
+                          background: "#fef9ec", border: "1px solid #f59e0b", borderRadius: 8,
+                          padding: 16, fontSize: 13, color: "#92400e", marginTop: 16
+                        }}>
+                          <strong>Note:</strong> It's customizable according to your requirements. Please feel free to get in touch with us for more information. Kindly mention the product code number while enquiring.
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const metalRows: Row[] = [
                     { label: "Metal Type", value: product?.metal_name },
-                    { label: "Purity", value: product?.karat ? `${product.karat}KT` : undefined },
-                    { label: "Gross Weight", value: product?.gross_weight ? `${product.gross_weight} g` : undefined },
-                    { label: "Net Weight", value: product?.net_weight ? `${product.net_weight} g` : undefined },
+                    { label: "Purity", value: product?.karat ? `${product.karat.toString().match(/\d+/)?.[0]}KT` : undefined },
+                    { label: "Gross Weight", value: product?.gross_weight ? `${product.gross_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} g` : undefined },
+                    { label: "Net Weight", value: product?.net_weight ? `${product.net_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} g` : undefined },
                     { label: "Metal Colour", value: product?.material_color },
                   ];
 
                   const hasDiamondData = product?.has_diamond === 1;
                   const diamondRows: Row[] = hasDiamondData ? [
-                    { label: "Diamond Weight", value: product?.diamond_weight ? `${product.diamond_weight} ct` : undefined },
+                    { label: "Diamond Weight", value: product?.diamond_weight ? `${product.diamond_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} ct` : undefined },
                     { label: "Diamond Pieces", value: product?.no_of_diamonds ? `${product.no_of_diamonds} pcs`: undefined },
                     { label: "Diamond Quality", value: product?.diamond_clarity },
                     { label: "Diamond Colour", value: product?.diamond_color },
@@ -701,15 +1007,13 @@ export default function ProductDetail() {
                     { label: "Diamond Setting", value: product?.diamond_setting },
                   ] : [];
 
-                  // Stone details — backend stores stone_details as JSON array of stones.
-                  // We render one combined row per stone if available.
                   const hasStoneData = product?.has_stone === 1 && Array.isArray(product?.stone_details) && product.stone_details.length > 0;
                   const stoneRows: Row[] = hasStoneData
                     ? product!.stone_details!.flatMap((s, i) => {
                         const idx = product!.stone_details!.length > 1 ? ` ${i + 1}` : "";
                         return [
                           { label: `Stone${idx} Name`, value: s.stone_name },
-                          { label: `Stone${idx} Weight`, value: s.stone_weight ? `${s.stone_weight} ct` : undefined },
+                          { label: `Stone${idx} Weight`, value: s.stone_weight ? `${s.stone_weight.toString().match(/[-+]?[0-9]*\.?[0-9]+/)?.[0]} ct` : undefined },
                         ] as Row[];
                       })
                     : [];
@@ -775,11 +1079,13 @@ export default function ProductDetail() {
               </h1>
 
               {/* Price — recomputed live when purity changes (mirrors backend formula) */}
-              <p style={{ fontSize: isMobile ? 26 : 32, fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>
-                {breakup ? format(breakup.total, { inputIncludesGst: true }) : 'Price not available'}
-              </p>
-              <p style={{ fontSize: 13, color: GOLD, fontWeight: 600, margin: "0 0 22px", textDecoration: "underline", cursor: "pointer" }}
-                onClick={() => setShowPriceBreakup(!showPriceBreakup)}>SEE PRICE BREAKUP</p>
+              <>
+                <p style={{ fontSize: isMobile ? 26 : 32, fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>
+                  {breakup ? format(breakup.total, { inputIncludesGst: true }) : 'Price not available'}
+                </p>
+                <p style={{ fontSize: 13, color: GOLD, fontWeight: 600, margin: "0 0 22px", textDecoration: "underline", cursor: "pointer" }}
+                  onClick={() => setShowPriceBreakup(!showPriceBreakup)}>SEE PRICE BREAKUP</p>
+              </>
 
               {/* Price Breakup Dropdown — driven by `breakup`, which scales with selected purity */}
               {showPriceBreakup && breakup && (
@@ -795,26 +1101,61 @@ export default function ProductDetail() {
                   <h3 style={{ fontSize: 15, fontWeight: 700, color: GOLD, letterSpacing: 0.5, margin: "0 0 16px" }}>PRICE BREAKUP</h3>
 
                   <div>
-                    {/* Component line items */}
-                    {breakup.rows.map(r => (
-                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
-                        <span style={{ color: "#6b7280", fontSize: 14 }}>{r.label}</span>
-                        <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>{format(r.amount, { inputIncludesGst: false })}</span>
-                      </div>
-                    ))}
+                    {breakup.comboItems ? (
+                      <>
+                        {breakup.comboItems.map((item, idx) => (
+                          <div key={idx} style={{ marginBottom: 20, paddingBottom: 16, borderBottom: idx < breakup.comboItems!.length - 1 ? "1px solid #e5e7eb" : "none" }}>
+                            <h4 style={{ fontSize: 14, fontWeight: 700, color: "#374151", margin: "0 0 12px", textTransform: "capitalize" }}>{item.name}</h4>
+                            {item.rows.map((r: any) => (
+                              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, gap: 12 }}>
+                                <span style={{ color: "#6b7280", fontSize: 13 }}>{r.label}</span>
+                                <span style={{ fontWeight: 600, color: "#111827", fontSize: 13, whiteSpace: "nowrap" }}>{format(r.amount, { inputIncludesGst: false })}</span>
+                              </div>
+                            ))}
+                            
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e5e7eb" }}>
+                              <span style={{ fontWeight: 600, color: "#4b5563", fontSize: 13 }}>Item Subtotal</span>
+                              <span style={{ fontWeight: 600, color: "#4b5563", fontSize: 13, whiteSpace: "nowrap" }}>{format(item.subTotal, { inputIncludesGst: false })}</span>
+                            </div>
 
-                    {/* Subtotal (before GST) */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: "1px dashed #e5e7eb" }}>
-                      <span style={{ fontWeight: 600, color: "#374151" }}>Subtotal</span>
-                      <span style={{ fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{format(breakup.subTotal, { inputIncludesGst: false })}</span>
-                    </div>
+                            {item.gstAmount > 0 && (
+                              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                                <span style={{ color: "#6b7280", fontSize: 13 }}>{item.gstLabel}</span>
+                                <span style={{ fontWeight: 600, color: "#6b7280", fontSize: 13, whiteSpace: "nowrap" }}>+ {format(item.gstAmount, { inputIncludesGst: false })}</span>
+                              </div>
+                            )}
 
-                    {/* GST */}
-                    {breakup.gstAmount > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-                        <span style={{ color: "#6b7280", fontSize: 14 }}>{breakup.gstLabel}</span>
-                        <span style={{ fontWeight: 600, color: "#6b7280", whiteSpace: "nowrap" }}>+ {format(breakup.gstAmount, { inputIncludesGst: false })}</span>
-                      </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                              <span style={{ fontWeight: 700, color: "#111827", fontSize: 14 }}>Item Total</span>
+                              <span style={{ fontWeight: 700, color: "#111827", fontSize: 14, whiteSpace: "nowrap" }}>{format(item.total, { inputIncludesGst: true })}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        {/* Component line items */}
+                        {breakup.rows.map(r => (
+                          <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
+                            <span style={{ color: "#6b7280", fontSize: 14 }}>{r.label}</span>
+                            <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>{format(r.amount, { inputIncludesGst: false })}</span>
+                          </div>
+                        ))}
+
+                        {/* Subtotal (before GST) */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: "1px dashed #e5e7eb" }}>
+                          <span style={{ fontWeight: 600, color: "#374151" }}>Subtotal</span>
+                          <span style={{ fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{format(breakup.subTotal, { inputIncludesGst: false })}</span>
+                        </div>
+
+                        {/* GST */}
+                        {breakup.gstAmount > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+                            <span style={{ color: "#6b7280", fontSize: 14 }}>{breakup.gstLabel}</span>
+                            <span style={{ fontWeight: 600, color: "#6b7280", whiteSpace: "nowrap" }}>+ {format(breakup.gstAmount, { inputIncludesGst: false })}</span>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {/* Grand total — highlighted */}
@@ -823,7 +1164,7 @@ export default function ProductDetail() {
                       marginTop: 14, padding: "12px 14px",
                       background: `${GOLD}14`, border: `1px solid ${GOLD}33`, borderRadius: 8,
                     }}>
-                      <span style={{ fontWeight: 700, fontSize: 16, color: "#111827" }}>Total</span>
+                      <span style={{ fontWeight: 700, fontSize: 16, color: "#111827" }}>{breakup.comboItems ? "Grand Total" : "Total"}</span>
                       <span style={{ fontWeight: 700, fontSize: 18, color: GOLD, whiteSpace: "nowrap" }}>{format(breakup.total, { inputIncludesGst: true })}</span>
                     </div>
                     <p style={{ fontSize: 11, color: "#9ca3af", margin: "8px 0 0", textAlign: "right" }}>Inclusive of all taxes</p>
@@ -838,14 +1179,25 @@ export default function ProductDetail() {
                 </p>
                 <div style={{ display: "flex", gap: 18, paddingLeft: 6 }}>
                   {Object.entries(COLOR_MAP).filter(([key]) => {
-                    if (!product?.material_color) return key === "white"; // default if missing
-                    const mColor = product.material_color.toLowerCase();
+                    let mColors: string[] = [];
+                    if (isCombo && comboData) {
+                      comboData.combo_items?.forEach((item: any) => {
+                        if (item.material_color) mColors.push(item.material_color.toLowerCase());
+                      });
+                    } else if (product?.material_color) {
+                      mColors.push(product.material_color.toLowerCase());
+                    }
+
+                    if (mColors.length === 0) return key === "white"; // default if missing
+                    
+                    const mColorStr = mColors.join(',');
+
                     // Each color is checked independently — a product with material_color
                     // "Yellow, White" should show BOTH swatches, not just the first match.
-                    if (key === "yellow") return mColor.includes("yellow");
+                    if (key === "yellow") return mColorStr.includes("yellow");
                     // "rose" also matches legacy "pink" data, but always shows as Rose Gold.
-                    if (key === "rose") return mColor.includes("rose") || mColor.includes("pink");
-                    if (key === "white") return mColor.includes("white");
+                    if (key === "rose") return mColorStr.includes("rose") || mColorStr.includes("pink");
+                    if (key === "white") return mColorStr.includes("white");
                     return false;
                   }).map(([key, hex]) => {
                     const label = key === "yellow" ? "Yellow Gold" : key === "rose" ? "Rose Gold" : "White Gold";

@@ -598,7 +598,7 @@ function ProductCard({ product }: { product: Product }) {
   const availableSwatches = COLOR_SWATCHES.filter(s => s.match(materialColor));
   // MRP comes from z_all_products.actual_price. Only render the strikethrough when
   // it's genuinely higher than the selling price — no fake 12% markup anymore.
-  const mrp = Number(product.actual_price || 0) > Number(product.price || 0)
+  const mrp = Number(product.actual_price || 0) > Number(product.price || 0) && !product.is_combo
     ? Number(product.actual_price)
     : 0;
 
@@ -611,7 +611,7 @@ function ProductCard({ product }: { product: Product }) {
     let cancelled = false;
     const sync = async () => {
       const map = await getWishlistProductMap();
-      if (!cancelled) setInWishlist(map.has(product.id));
+      if (!cancelled) setInWishlist(map.has(Number(product.id)));
     };
     sync();
     const refresh = () => sync();
@@ -637,7 +637,7 @@ function ProductCard({ product }: { product: Product }) {
       return;
     }
     setBusy('cart');
-    const res = await apiService.addToCart(user.id, product.id, 1, 0, user.role);
+    const res = await apiService.addToCart(user.id, Number(product.id), 1, 0, user.role);
     if (res.success) {
       dispatchCartUpdate();
       flashToast('Added to cart');
@@ -660,7 +660,7 @@ function ProductCard({ product }: { product: Product }) {
     setBusy('wishlist');
     const previous = inWishlist;
     setInWishlist(!previous);
-    const res = await toggleWishlistWithUpdate(product.id);
+    const res = await toggleWishlistWithUpdate(Number(product.id));
     if (!res.success) {
       setInWishlist(previous);
       flashToast('Failed to update wishlist');
@@ -899,13 +899,28 @@ export default function ProductList() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [categoriesData, productsData] = await Promise.all([
+        const [categoriesData, productsData, comboData] = await Promise.all([
           apiService.getCategoriesWithSubcategories(),
-          apiService.getProducts()
+          apiService.getProducts(),
+          apiService.getComboProducts()
         ]);
+        
+        const mappedCombos: Product[] = comboData.map(c => ({
+          id: `combo-${c.id}`,
+          product_name: c.combo_name,
+          product_image: c.combo_main_image,
+          price: c.combo_total_price || 0,
+          category_id: 0,
+          is_combo: true,
+          gender: c.combo_gender,
+          description: c.combo_description
+        }));
+        
+        const combinedProducts = [...productsData.products, ...mappedCombos];
+        
         setCategories(categoriesData);
-        setAllProducts(productsData.products);
-        setProducts(productsData.products);
+        setAllProducts(combinedProducts);
+        setProducts(combinedProducts);
         
         // Set initial category filter from URL param
         if (categoryParam) {
@@ -1032,7 +1047,7 @@ export default function ProductList() {
           filtered.sort((a, b) => b.product_name.localeCompare(a.product_name));
           break;
         case "Newest First":
-          filtered.sort((a, b) => b.id - a.id);
+          filtered.sort((a, b) => Number(b.id) - Number(a.id));
           break;
         default:
           // Default sorting - no change

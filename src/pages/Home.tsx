@@ -446,9 +446,9 @@ function TrendingStyles({ w }: { w: number }) {
 
               {/* Wishlist heart — top right, inside the inner tile */}
               <button
-                onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleWishlistToggle(p.id); }}
-                disabled={togglingId === p.id}
-                aria-label={wishlistIds.has(p.id) ? "Remove from wishlist" : "Add to wishlist"}
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleWishlistToggle(Number(p.id)); }}
+                disabled={togglingId === Number(p.id)}
+                aria-label={wishlistIds.has(Number(p.id)) ? "Remove from wishlist" : "Add to wishlist"}
                 style={{
                   position: "absolute",
                   top: isDesktop ? 22 : isTablet ? 20 : 16,
@@ -464,7 +464,7 @@ function TrendingStyles({ w }: { w: number }) {
                   cursor: togglingId === p.id ? "wait" : "pointer",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
                 }}>
-                <HeartIcon filled={wishlistIds.has(p.id)} dark />
+                <HeartIcon filled={wishlistIds.has(Number(p.id))} dark />
               </button>
             </div>
 
